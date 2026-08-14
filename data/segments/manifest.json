@@ -19,7 +19,7 @@
    "piece": "Burgmuller The Storm All Markings Version",
    "measures": [
     1,
-    16
+    9
    ],
    "n_notes": 293,
    "n_labeled": 293,
@@ -30,8 +30,8 @@
    "id": "burgmuller_the_storm__s1",
    "piece": "Burgmuller The Storm All Markings Version",
    "measures": [
-    17,
-    32
+    10,
+    18
    ],
    "n_notes": 319,
    "n_labeled": 307,
@@ -241,6 +241,78 @@
    "n_labeled": 570,
    "bar_ms": 3000,
    "time_signature": "12/8"
+  },
+  {
+   "id": "liszt_hungarian_rhapsody_no_2__s0",
+   "piece": "liszt-hungarian-rhapsody-no-2",
+   "measures": [
+    179,
+    210
+   ],
+   "n_notes": 580,
+   "n_labeled": 577,
+   "bar_ms": 1000,
+   "time_signature": "2/4"
+  },
+  {
+   "id": "liszt_hungarian_rhapsody_no_2__s1",
+   "piece": "liszt-hungarian-rhapsody-no-2",
+   "measures": [
+    211,
+    242
+   ],
+   "n_notes": 488,
+   "n_labeled": 464,
+   "bar_ms": 1000,
+   "time_signature": "2/4"
+  },
+  {
+   "id": "liszt_hungarian_rhapsody_no_2__s3",
+   "piece": "liszt-hungarian-rhapsody-no-2",
+   "measures": [
+    275,
+    306
+   ],
+   "n_notes": 500,
+   "n_labeled": 491,
+   "bar_ms": 1000,
+   "time_signature": "2/4"
+  },
+  {
+   "id": "liszt_hungarian_rhapsody_no_2__s4",
+   "piece": "liszt-hungarian-rhapsody-no-2",
+   "measures": [
+    307,
+    338
+   ],
+   "n_notes": 499,
+   "n_labeled": 468,
+   "bar_ms": 1000,
+   "time_signature": "2/4"
+  },
+  {
+   "id": "liszt_hungarian_rhapsody_no_2__s5",
+   "piece": "liszt-hungarian-rhapsody-no-2",
+   "measures": [
+    339,
+    370
+   ],
+   "n_notes": 622,
+   "n_labeled": 604,
+   "bar_ms": 1000,
+   "time_signature": "2/4"
+  },
+  {
+   "id": "liszt_hungarian_rhapsody_no_2__s6",
+   "piece": "liszt-hungarian-rhapsody-no-2",
+   "measures": [
+    371,
+    402
+   ],
+   "n_notes": 510,
+   "n_labeled": 510,
+   "bar_ms": 1000,
+   "time_signature": "2/4"
   },
   {
    "id": "nocturne_opus_72_no_1_in_e_minor__s0",

@@ -274,10 +274,13 @@ function renderSide() {
       </div>`;
   } else {
     const r = rep.phase2, a = aggr.phase2;
+    const levelLabel = {exact: "exact ✓", double: "OK as 2× bar", half: "OK as ½ bar",
+                        wrong: "level wrong"}[r.level] || pct(r.recall);
     side.innerHTML = `
       <div class="card"><h2>Phase 2 — this segment</h2>
-        <div class="big ${r.strict ? "ok" : "bad"}">${r.strict ? "strict ✓" : pct(r.recall)}</div>
+        <div class="big ${r.level !== "wrong" ? "ok" : "bad"}">${levelLabel}</div>
         <table>
+          <tr><td>level verdict</td><td>${r.level} (2/4≡4/4, 12/8≡6/8)</td></tr>
           <tr><td>recall</td><td>${pct(r.recall)}</td></tr>
           <tr><td>precision</td><td>${pct(r.precision)}</td></tr>
           <tr><td>matched / missed / extra</td><td>${r.tp} / ${r.fn} / ${r.fp}</td></tr>
@@ -289,11 +292,11 @@ function renderSide() {
         </table>
       </div>
       <div class="card"><h2>Phase 2 — all segments</h2>
-        <div class="big ${a.recall >= 0.98 ? "ok" : "bad"}">${pct(a.recall)} recall</div>
+        <div class="big ${a.acceptable / a.n >= 0.98 ? "ok" : "bad"}">${a.acceptable}/${a.n} acceptable</div>
         <table>
-          <tr><td>north star</td><td>≥ 98%</td></tr>
-          <tr><td>precision</td><td>${pct(a.precision)}</td></tr>
-          <tr><td>strict segments</td><td>${a.strict}/${a.n}</td></tr>
+          <tr><td>exact level</td><td>${a.strict}/${a.n}</td></tr>
+          <tr><td>raw recall</td><td>${pct(a.recall)}</td></tr>
+          <tr><td>raw precision</td><td>${pct(a.precision)}</td></tr>
         </table>
       </div>`;
   }

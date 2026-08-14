@@ -42,7 +42,12 @@ Channels (all vote {time, weight}):
 Decision:
   1. Tactus: folded-mass search over log-spaced periods 240–1200 ms with
      a log-Gaussian prior around 600 ms (sigma in octaves — miditrain-6's
-     corpus-searched shape), then ±3% fine refinement.
+     corpus-searched shape), then ±3% fine refinement. The search keeps
+     the TOP-K distinct peaks, not just the winner — the tactus and the
+     bar level are decided JOINTLY (step 2), because a plausible-looking
+     pulse can carry a hopeless bar (measured: a 749 ms triplet-layer
+     lock in a 2/4 friska, a 618 ms lock in the Waldstein chorale —
+     both with the true 500 ms pulse present as a secondary peak).
   2. Bar: grouping G ∈ {2,3,4} × phase k·P. LEVEL (which G) is chosen
      on the PERIODIC structural channels only, per-line normalized, with
      a bar-length prior and a parsimony margin; PHASE within the chosen
@@ -51,7 +56,11 @@ Decision:
      mechanically inflates longer bars (measured: the entry channel
      alone flipped a 2/4 and a 6/8 piece to doubled bars). A
      contrast-vs-other-beats score was tried and measured OUT (it
-     punishes 4/4 for having a legitimately strong beat 3).
+     punishes 4/4 for having a legitimately strong beat 3). G=3 must
+     additionally beat the best duple grouping by `triple_margin` —
+     duple is the default reading, triple needs positive evidence (2/4
+     textures kept electing G=3 by ~2%). The winning (tactus, G, phase)
+     maximizes tactus_score x level_score across the K candidates.
   3. Downbeats projected from (bar_ms, phase), then (period, phase)
      refined by least squares against the onset votes the grid captured
      (kills the ~0.4% tactus quantization drift that walked late bars
@@ -79,6 +88,9 @@ PARAMS = {
     # (8/8 strict). Key lever vs the first tune: parsimony 1.12 -> 1.3.
     "groupings": (2, 3, 4),
     "parsimony_margin": 1.3,    # larger G must beat G=2 by this factor
+    "triple_margin": 1.10,      # G=3 must beat the best duple by this
+    "n_tactus_candidates": 5,   # top-K distinct peaks carried into step 2
+    "tactus_peak_sep": 0.08,    # peaks must differ by this period fraction
     "bar_prior_center_ms": 1900.0,     # miditrain-6 corpus-searched values
     "bar_prior_sigma_oct": 1.4,
     "w_onset": 1.0,
@@ -224,6 +236,8 @@ def _folded_best_phase(vote_list, period, tol):
 
 
 def _tactus(votes, p):
+    """Top-K distinct tactus peaks, each fine-refined: [(period, phase,
+    score)] sorted best-first. The bar search decides among them."""
     lo, hi = p["min_period_ms"], p["max_period_ms"]
     cands = [lo * (hi / lo) ** (k / (p["n_periods"] - 1))
              for k in range(p["n_periods"])]
@@ -239,15 +253,21 @@ def _tactus(votes, p):
         # mass per grid line, so short periods don't win by having more lines
         return prior(period) * mass, phase
 
-    best = max(((score(c), c) for c in cands), key=lambda x: x[0][0])
-    (s, phase), period = best
-    # fine refinement ±3%
-    for k in range(p["fine_steps"] + 1):
-        c = period * (0.97 + 0.06 * k / p["fine_steps"])
-        (s2, ph2) = score(c)
-        if s2 > s:
-            s, phase, period = s2, ph2, c
-    return period, phase
+    scored = sorted(((score(c), c) for c in cands), key=lambda x: -x[0][0])
+    peaks = []
+    for (s, phase), period in scored:
+        if len(peaks) >= p["n_tactus_candidates"]:
+            break
+        if any(abs(period - q) / q < p["tactus_peak_sep"] for q, _, _ in peaks):
+            continue
+        # fine refinement ±3%
+        for k in range(p["fine_steps"] + 1):
+            c = period * (0.97 + 0.06 * k / p["fine_steps"])
+            (s2, ph2) = score(c)
+            if s2 > s:
+                s, phase, period = s2, ph2, c
+        peaks.append((period, phase, s))
+    return peaks
 
 
 def _bar(votes, tactus_ms, tactus_phase, span_ms, p):
@@ -280,12 +300,13 @@ def _bar(votes, tactus_ms, tactus_phase, span_ms, p):
                 best = (per_line, phase)
         results[g] = best
     base = results[2][0] or 1e-9
-    g_win, (s_win, _) = 2, results[2]
-    for g in p["groupings"]:
-        if g == 2:
-            continue
-        if results[g][0] > p["parsimony_margin"] * base and results[g][0] > s_win:
-            g_win, (s_win, _) = g, results[g]
+    g_win, s_win = 2, results[2][0]
+    if 4 in results and results[4][0] > p["parsimony_margin"] * base \
+            and results[4][0] > s_win:
+        g_win, s_win = 4, results[4][0]
+    if 3 in results and results[3][0] > p["parsimony_margin"] * base \
+            and results[3][0] > p["triple_margin"] * s_win:
+        g_win, s_win = 3, results[3][0]
 
     # phase within the level: periodic + one-shot entry votes, raw mass
     bar = g_win * tactus_ms
@@ -295,7 +316,29 @@ def _bar(votes, tactus_ms, tactus_phase, span_ms, p):
         mass = folded(periodic + votes["entry"], phase, bar)
         if mass > best_mass:
             best_mass, phase_win = mass, phase
-    return g_win, phase_win
+    return g_win, phase_win, s_win
+
+
+def grid_level_score(votes, bar_ms, phase, span_ms, params=None):
+    """Score an ARBITRARY (bar, phase) grid on the current votes — the
+    same per-line periodic mass x bar prior used inside _bar, exposed so
+    a streaming tracker can compare an incumbent grid against a fresh
+    inference on equal terms."""
+    p = dict(PARAMS)
+    if params:
+        p.update(params)
+    periodic = (votes["bass"] + votes["chord"] + votes["agogic"]
+                + votes["velocity"] + votes["harmony"])
+    tol = p["fold_tol_frac"] * bar_ms / 2.0
+    mass = 0.0
+    for v in periodic:
+        d = (v["t"] - phase) % bar_ms
+        if d <= tol or bar_ms - d <= tol:
+            mass += v["w"]
+    n_lines = max(1.0, span_ms / bar_ms)
+    octs = math.log2(bar_ms / p["bar_prior_center_ms"])
+    prior = math.exp(-0.5 * (octs / p["bar_prior_sigma_oct"]) ** 2)
+    return mass / n_lines * prior
 
 
 def _refine_grid(bar_ms, phase, votes, span_ms, p):
@@ -342,9 +385,15 @@ def infer_downbeats(notes, hands, params=None):
     if not notes:
         return {"downbeats_ms": [], "bar_ms": None}
     votes = build_votes(notes, hands, p)
-    tactus_ms, tactus_phase = _tactus(votes, p)
     span = max(n["onset_ms"] + n["duration_ms"] for n in notes)
-    g, bar_phase = _bar(votes, tactus_ms, tactus_phase, span, p)
+    # joint (tactus, level) decision over the top-K tactus peaks
+    best = None
+    for tactus_ms, tactus_phase, t_score in _tactus(votes, p):
+        g, bar_phase, level_score = _bar(votes, tactus_ms, tactus_phase, span, p)
+        joint = t_score * level_score
+        if best is None or joint > best[0]:
+            best = (joint, tactus_ms, g, bar_phase)
+    _, tactus_ms, g, bar_phase = best
     bar_ms = g * tactus_ms
     bar_ms, bar_phase = _refine_grid(bar_ms, bar_phase, votes, span, p)
 

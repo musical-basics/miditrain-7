@@ -45,6 +45,18 @@ MS_PER_QUARTER = 500.0      # 120 BPM convention
 BARS_PER_SEGMENT = 16
 MATCH_TOL_MS = 10           # MIDI<->XML onset tolerance
 
+# Per-piece ingest rules (keys match the source file stem). Score measure
+# numbers, as printed. Only applied to pieces without repeats — expanded
+# scores repeat measure numbers, which would make the ranges ambiguous.
+OVERRIDES = {
+    "liszt-hungarian-rhapsody-no-2": {
+        "start_measure": 179,             # friska; the lassan before it is
+                                          # rubato-heavy and out of scope
+        "exclude_measures": [(414, 435)], # cadenza
+        "bars_per_segment": 32,           # 2/4: 32 bars = the usual 32 s span
+    },
+}
+
 
 def slug(name):
     s = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")
@@ -135,11 +147,13 @@ def parse_xml(path, expand=True):
         print(f"  pickup: trimmed {trimmed} leading partial measure(s), "
               f"starting at measure {measures[0].number}")
 
-    downbeats_ms = [round(float(m.offset) * MS_PER_QUARTER) for m in measures]
+    # (number, offset_ms) per measure — numbers are the printed ones, so
+    # per-piece OVERRIDES can speak the score's language.
+    meas = [(m.number, round(float(m.offset) * MS_PER_QUARTER)) for m in measures]
     # Even-grid check is PER SEGMENT WINDOW (in main), not whole-piece: one
     # irregular bar (volta quirk, engraving error) should only invalidate
     # the windows containing it, not the piece.
-    return truth_notes, downbeats_ms, bar_ms, ts.ratioString, has_repeats
+    return truth_notes, meas, bar_ms, ts.ratioString, has_repeats
 
 
 def label_hands(midi_notes, truth_notes):
@@ -162,26 +176,39 @@ def label_hands(midi_notes, truth_notes):
     return hands, unmatched
 
 
-def build_segments(stem, pslug, midi_notes, truth_notes, downbeats_ms,
-                   bar_ms, ts):
-    """All valid 16-bar segments for one (MIDI, truth-variant) pairing.
-    Returns (segments, log_lines)."""
-    hands, unmatched = label_hands(midi_notes, truth_notes)
-    n_segments = len(downbeats_ms) // BARS_PER_SEGMENT
+def build_segments(stem, pslug, midi_notes, truth_notes, meas,
+                   bar_ms, ts, over=None):
+    """All valid segments for one (MIDI, truth-variant) pairing.
+    `meas` = [(printed_number, offset_ms)]. Returns (segments, log_lines)."""
+    over = over or {}
+    bars = over.get("bars_per_segment", BARS_PER_SEGMENT)
+    excludes = over.get("exclude_measures", [])
     segments, log = [], []
-    log.append(f"{stem}: {len(midi_notes)} MIDI notes, {len(downbeats_ms)} bars, "
-               f"{ts}, bar={bar_ms}ms -> {n_segments} windows "
+    if "start_measure" in over:
+        before = len(meas)
+        meas = [m for m in meas if m[0] >= over["start_measure"]]
+        log.append(f"  override: starting at measure {over['start_measure']} "
+                   f"({before - len(meas)} measures dropped)")
+    hands, unmatched = label_hands(midi_notes, truth_notes)
+    n_segments = len(meas) // bars
+    log.append(f"{stem}: {len(midi_notes)} MIDI notes, {len(meas)} bars, "
+               f"{ts}, bar={bar_ms}ms -> {n_segments} windows of {bars} bars "
                f"({unmatched} unmatched notes)")
     for k in range(n_segments):
-            window = downbeats_ms[k * BARS_PER_SEGMENT:(k + 1) * BARS_PER_SEGMENT]
+            numbers = [n for n, _ in meas[k * bars:(k + 1) * bars]]
+            window = [d for _, d in meas[k * bars:(k + 1) * bars]]
+            if any(lo <= n <= hi for n in numbers for lo, hi in excludes):
+                log.append(f"  SKIP segment {k} (measures {numbers[0]}–{numbers[-1]}): "
+                           "overlaps an excluded range")
+                continue
             # window anchors on its own first downbeat (an irregular bar
             # earlier in the piece shifts everything globally; the window
             # only needs to be internally even)
             start = window[0]
-            end = start + BARS_PER_SEGMENT * bar_ms
-            if [d - start for d in window] != [b * bar_ms for b in range(BARS_PER_SEGMENT)]:
-                log.append(f"  SKIP segment {k}: uneven measure grid inside bars "
-                           f"{k * BARS_PER_SEGMENT + 1}–{(k + 1) * BARS_PER_SEGMENT}")
+            end = start + bars * bar_ms
+            if [d - start for d in window] != [b * bar_ms for b in range(bars)]:
+                log.append(f"  SKIP segment {k}: uneven measure grid inside "
+                           f"measures {numbers[0]}–{numbers[-1]}")
                 continue
             idx = [i for i, n in enumerate(midi_notes)
                    if start <= n["onset_ms"] < end]
@@ -194,13 +221,13 @@ def build_segments(stem, pslug, midi_notes, truth_notes, downbeats_ms,
                 "id": f"{pslug}__s{k}",
                 "piece": stem,
                 "segment_index": k,
-                "measures": [k * BARS_PER_SEGMENT + 1, (k + 1) * BARS_PER_SEGMENT],
+                "measures": [numbers[0], numbers[-1]],
                 "bar_ms": bar_ms,
-                "n_bars": BARS_PER_SEGMENT,
+                "n_bars": bars,
                 "notes": seg_notes,
                 "truth": {
                     "time_signature": ts,
-                    "downbeats_ms": [b * bar_ms for b in range(BARS_PER_SEGMENT)],
+                    "downbeats_ms": [b * bar_ms for b in range(bars)],
                     "hand": [hands[i] for i in idx],
                 },
             }
@@ -229,6 +256,7 @@ def main():
             continue
         midi_notes = parse_midi(mid)
         pslug = slug(stem)
+        over = OVERRIDES.get(stem)
 
         # Try repeat expansion both ways; keep whichever the MIDI agrees
         # with (more surviving segments, then more labeled notes). Some
@@ -236,14 +264,17 @@ def main():
         variants = []
         for expand in (True, False):
             try:
-                truth_notes, downbeats_ms, bar_ms, ts, has_repeats = \
+                truth_notes, meas, bar_ms, ts, has_repeats = \
                     parse_xml(xml, expand)
             except ValueError as e:
                 if expand:
                     print(f"SKIP {stem}: {e}")
                 break
+            if over and has_repeats:
+                raise SystemExit(f"{stem}: OVERRIDES need unique printed measure "
+                                 "numbers; piece has repeats")
             segs, log = build_segments(stem, pslug, midi_notes, truth_notes,
-                                       downbeats_ms, bar_ms, ts)
+                                       meas, bar_ms, ts, over)
             variants.append((len(segs), sum(s["_labeled"] for s in segs),
                              expand, segs, log))
             if not has_repeats:

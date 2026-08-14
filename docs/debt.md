@@ -1,17 +1,21 @@
 # Debt / open questions
 
-- **Bar-LEVEL selection redesign** (2026-08-14, TOP ITEM): the sweep
-  proved the accent-folding + prior + parsimony mechanism is at its
-  ceiling (432 configs, none beats the adopted one; knobs trade meters
-  against each other). Design direction: level should be voted by
-  channels whose natural period IS the bar — harmonic rhythm (period of
-  pitch-class-set change) and phrase parallelism (repetition lag) — with
-  accent folding keeping phase duty. Also: groupings max G=4 cannot
-  express 12/8 from an eighth-note tactus (op9/2); the tactus/level
-  interaction needs to be joint, not sequential.
-- **waldstein_s4 tactus** (2026-08-14): first tactus failure in the
-  corpus (618 ms lock on a dotted-rhythm chorale texture, true 500).
-  Diagnose the fold scores around 500 vs 618.
+- **NO 3/4 PIECE IN THE CORPUS** (2026-08-14): the user ranks 3/4 among
+  the three canonical meters (3/4, 4/4, 6/8), and the new `triple_margin`
+  (G=3 must beat the best duple by 1.10) has never been tested against a
+  real triple-meter piece — it could suppress legitimate 3/4 readings.
+  Add waltz/mazurka/minuet pairs before trusting the margin.
+- **hungarian_s1: true pulse not among the top-5 tactus peaks**
+  (2026-08-14): the friska's csárdás syncopation projects 749/563/375 ms
+  periodicities; the true 500 ms pulse has no peak at all, and the
+  true-bar candidate (250 ms x4) loses the joint score by 9%. This is
+  the concrete case for a harmonic-rhythm level voter (chords change per
+  1000 ms there). 1 of 34 segments.
+- **Bar-LEVEL selection, remaining half** (2026-08-14): the joint
+  (tactus x level) decision over top-K peaks + triple margin fixed
+  waldstein_s4 and rage_s0. Still missing: harmonic rhythm and phrase
+  parallelism as level voters (see hungarian_s1), and G is capped at 4
+  (a 12/8 bar is unreachable from an eighth-note tactus).
 - **Rage/Waldstein MIDI/XML desync past the exposition** (2026-08-14):
   both exports take repeats differently than music21 expands them; the
   segmenter keeps the better variant but late-piece windows still drop.

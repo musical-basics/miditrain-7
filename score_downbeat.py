@@ -29,6 +29,35 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SEG_DIR = os.path.join(HERE, "data", "segments")
 
 
+def level_verdict(pred_bar, truth_bar, tp, fp, fn):
+    """Meter-equivalence classes (user decision 2026-08-14): notating a
+    2/4 piece as 4/4, or a 12/8 piece as 6/8, is acceptable — the
+    canonical target meters are 3/4, 4/4, 6/8.
+
+      exact    right bar, every downbeat, no extras
+      double   bar = 2x truth AND every claimed downbeat is a true one
+               (2/4 read as 4/4 — every claim lands on a real downbeat)
+      half     bar = truth/2 AND every true downbeat is claimed
+               (12/8 read as 6/8 — extras are the true half-bars)
+      wrong    anything else (e.g. 1.5x bars, misphased grids)
+    """
+    if not pred_bar or not truth_bar:
+        return "wrong"
+    r = pred_bar / truth_bar
+    rec = tp / (tp + fn) if tp + fn else 0.0
+    prec = tp / (tp + fp) if tp + fp else 0.0
+    # "exact" is a LEVEL verdict: right bar, right phase, >=90% of
+    # downbeats — a single sparse-bar miss is not a level failure (the
+    # separate `strict` count still demands zero errors)
+    if 0.98 < r < 1.02 and rec >= 0.9 and prec >= 0.9:
+        return "exact"
+    if 1.96 < r < 2.04 and fp == 0 and tp > 0:
+        return "double"
+    if 0.49 < r < 0.51 and fn == 0 and tp > 0:
+        return "half"
+    return "wrong"
+
+
 def match(pred, truth, tol, coverage_end=None):
     """One-to-one two-pointer matching. Returns (tp, fp, fn).
 
@@ -63,9 +92,9 @@ def main():
     paths = sorted(glob.glob(os.path.join(SEG_DIR, "*.json")))
     paths = [p for p in paths if not p.endswith("manifest.json")]
     rows = {}
-    T = {"tp": 0, "fp": 0, "fn": 0, "strict": 0, "n": 0}
+    T = {"tp": 0, "fp": 0, "fn": 0, "strict": 0, "acceptable": 0, "n": 0}
     print(f"{'segment':<29} {'bar_ms':>7} {'beats':>5} {'phase':>6} "
-          f"{'recall':>7} {'prec':>6} {'strict':>6}")
+          f"{'recall':>7} {'prec':>6} {'level':>7}")
     for path in paths:
         with open(path) as f:
             seg = json.load(f)
@@ -77,10 +106,12 @@ def main():
         recall = tp / (tp + fn) if tp + fn else 0.0
         prec = tp / (tp + fp) if tp + fp else 0.0
         strict = fp == 0 and fn == 0
+        level = level_verdict(res["bar_ms"], seg["bar_ms"], tp, fp, fn)
         T["tp"] += tp
         T["fp"] += fp
         T["fn"] += fn
         T["strict"] += strict
+        T["acceptable"] += (level != "wrong")
         T["n"] += 1
         true_beats = int(seg["truth"]["time_signature"].split("/")[0])
         rows[seg["id"]] = {
@@ -88,23 +119,27 @@ def main():
             "bar_phase_ms": res["bar_phase_ms"], "tactus_ms": res["tactus_ms"],
             "tp": tp, "fp": fp, "fn": fn,
             "recall": round(recall, 4), "precision": round(prec, 4),
-            "strict": strict,
+            "strict": strict, "level": level,
             "truth": {"bar_ms": seg["bar_ms"], "beats_per_bar": true_beats},
         }
-        mark = "  OK" if strict else ("  ~" if recall >= 0.9 else "  XX")
+        mark = {"exact": "  OK", "double": "  OK (as 2x)", "half": "  OK (as 1/2)",
+                "wrong": "  XX"}[level]
         print(f"{seg['id']:<29} {res['bar_ms']:7.0f} {res['beats_per_bar']:>5} "
               f"{res['bar_phase_ms']:6.0f} {recall*100:6.1f}% {prec*100:5.1f}% "
-              f"{str(strict):>6}{mark}")
+              f"{level:>7}{mark}")
 
     recall = T["tp"] / (T["tp"] + T["fn"]) if T["tp"] + T["fn"] else 0.0
     prec = T["tp"] / (T["tp"] + T["fp"]) if T["tp"] + T["fp"] else 0.0
     f1 = 2 * prec * recall / (prec + recall) if prec + recall else 0.0
-    print(f"\ndownbeat recall {recall*100:.1f}%  (north star: >=98%)   "
-          f"precision {prec*100:.1f}%   F1 {f1*100:.1f}%   "
-          f"strict segments {T['strict']}/{T['n']}")
+    print(f"\nacceptable segments {T['acceptable']}/{T['n']}  "
+          f"(north star: level within the 2/4=4/4, 12/8=6/8 equivalence)   "
+          f"exact {T['strict']}/{T['n']}")
+    print(f"raw downbeat recall {recall*100:.1f}%   precision {prec*100:.1f}%   "
+          f"F1 {f1*100:.1f}%")
     if args.json:
         agg = {"recall": round(recall, 4), "precision": round(prec, 4),
-               "f1": round(f1, 4), "strict": T["strict"], "n": T["n"],
+               "f1": round(f1, 4), "strict": T["strict"],
+               "acceptable": T["acceptable"], "n": T["n"],
                "tol_ms": args.tol}
         with open(args.json, "w") as f:
             json.dump({"segments": rows, "aggregate": agg}, f, indent=1)

@@ -1,5 +1,59 @@
 # Session Log — miditrain-7
 
+## 2026-08-14 (night) — Meter equivalence; joint tactus×level; the tracker works; Hungarian in
+
+**User decisions that reshaped the target:** 2/4 and 4/4 are
+interchangeable (2/4 always read as 4/4 would be fine), 3/8≡6/8,
+12/8→6/8 fine. Canonical meters: **3/4, 4/4, 6/8**. Scoring now has
+level verdicts (score_downbeat.level_verdict): `exact` (ratio 1, ≥90%
+recall+precision — one sparse-bar miss is not a level failure; `strict`
+still counts zero-error separately), `double` (2x bar, every claim on a
+true downbeat), `half` (1/2 bar, every true downbeat claimed), `wrong`.
+Headline metric = acceptable segments.
+
+**Hungarian Rhapsody No.2 ingested** with per-piece OVERRIDES
+(make_segments): start at m.179 (friska; lassan out of scope), cadenza
+m.414–435 excluded, 32-bar windows (2/4 → same 32 s span). 6 clean
+segments, 96–100% labeled. Corpus: **10 pieces, 34 segments**.
+Rage v2 .mid: measured identical to v1, unused.
+
+**Engine — two architectural changes, both measured in:**
+1. **Joint (tactus × level) decision.** _tactus now returns the top-5
+   distinct peaks; _bar scores each; winner maximizes tactus_score ×
+   level_score. This fixed waldstein_s4 (618 ms false pulse — true 500
+   was a secondary peak whose bar level wins jointly) — 6.2% → 100%.
+2. **triple_margin 1.10**: G=3 must beat the best duple by 10% — duple
+   is the default reading, triple needs positive evidence. Fixed
+   rage_s0 (G=3 was winning over G=4 by 1.7%). UNTESTED against real
+   3/4 (none in corpus — top debt).
+
+**Result: 33/34 acceptable, 26/34 exact-level.** Only
+hungarian_s1 is wrong — diagnosed precisely: the csárdás syncopation
+projects 749/563/375 ms periodicities and the true 500 ms pulse has NO
+fold peak at all; the true-bar candidate loses the joint by 9%. The
+harmonic-rhythm level voter (chords change per 1000 ms there) is the
+designed fix. Re-tuned on the split post-change: the raw-F1 winner
+(prior 1400 / parsimony 1.05) merely SWAPS the failing segment
+(hungarian_s1 ↔ rage_s0) at equal acceptability — current params kept;
+weights are exhausted, the voter is the next lever.
+
+**Streaming hysteresis tracker** (measure_lock): incumbent grid must be
+CONFIRMED by 2 agreeing fresh inferences before earning inertia (an
+early 4-note lock must not be sticky), then challengers need 1.25x its
+score on current votes; drift-corrected each step by the least-squares
+refinement. With equivalence-aware correctness:
+- raw from-scratch: 33/34 lock, median 6.75 s
+- **tracked: 31/34 lock, median 4.75 s, worst 19 s** — inertia now
+  BEATS from-scratch on both speed and stability. The ambiguous opening
+  is resolved and HELD from ~4.25–4.75 s (≈2 bars) in the typical case.
+- Never-locks: hungarian_s1 (offline-wrong), storm_s0 + hungarian_s3
+  (tracker sticks on an early plausible grid — hysteresis tuning or the
+  level voter will decide).
+
+GUI: level verdicts shown per segment + acceptable aggregate. Verified
+headless, 0 JS errors.
+
+
 ## 2026-08-14 (evening) — All 9 pieces in (28 segments); the level-selection frontier is now mapped
 
 **Data fixes, all user-driven:**
