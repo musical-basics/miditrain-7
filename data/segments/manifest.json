@@ -135,26 +135,38 @@
    "time_signature": "2/4"
   },
   {
+   "id": "beethoven_rage_over_a_lost_penny__s1",
+   "piece": "beethoven-rage-over-a-lost-penny",
+   "measures": [
+    17,
+    32
+   ],
+   "n_notes": 253,
+   "n_labeled": 253,
+   "bar_ms": 1000,
+   "time_signature": "2/4"
+  },
+  {
    "id": "beethoven_rage_over_a_lost_penny__s2",
    "piece": "beethoven-rage-over-a-lost-penny",
    "measures": [
     33,
     48
    ],
-   "n_notes": 271,
-   "n_labeled": 194,
+   "n_notes": 295,
+   "n_labeled": 280,
    "bar_ms": 1000,
    "time_signature": "2/4"
   },
   {
-   "id": "beethoven_rage_over_a_lost_penny__s6",
+   "id": "beethoven_rage_over_a_lost_penny__s3",
    "piece": "beethoven-rage-over-a-lost-penny",
    "measures": [
-    97,
-    112
+    49,
+    64
    ],
-   "n_notes": 286,
-   "n_labeled": 211,
+   "n_notes": 270,
+   "n_labeled": 270,
    "bar_ms": 1000,
    "time_signature": "2/4"
   },
@@ -207,6 +219,30 @@
    "time_signature": "6/8"
   },
   {
+   "id": "chopin_nocturne_op_9_no_2_e_flat_major__s0",
+   "piece": "chopin-nocturne-op-9-no-2-e-flat-major",
+   "measures": [
+    1,
+    16
+   ],
+   "n_notes": 594,
+   "n_labeled": 554,
+   "bar_ms": 3000,
+   "time_signature": "12/8"
+  },
+  {
+   "id": "chopin_nocturne_op_9_no_2_e_flat_major__s1",
+   "piece": "chopin-nocturne-op-9-no-2-e-flat-major",
+   "measures": [
+    17,
+    32
+   ],
+   "n_notes": 600,
+   "n_labeled": 570,
+   "bar_ms": 3000,
+   "time_signature": "12/8"
+  },
+  {
    "id": "nocturne_opus_72_no_1_in_e_minor__s0",
    "piece": "nocturne-opus-72-no-1-in-e-minor",
    "measures": [
@@ -239,6 +275,66 @@
    ],
    "n_notes": 400,
    "n_labeled": 395,
+   "bar_ms": 2000,
+   "time_signature": "4/4"
+  },
+  {
+   "id": "sonate_no_21_waldstein_1st_movement__s0",
+   "piece": "sonate-no-21-waldstein-1st-movement",
+   "measures": [
+    1,
+    16
+   ],
+   "n_notes": 393,
+   "n_labeled": 390,
+   "bar_ms": 2000,
+   "time_signature": "4/4"
+  },
+  {
+   "id": "sonate_no_21_waldstein_1st_movement__s1",
+   "piece": "sonate-no-21-waldstein-1st-movement",
+   "measures": [
+    17,
+    32
+   ],
+   "n_notes": 428,
+   "n_labeled": 425,
+   "bar_ms": 2000,
+   "time_signature": "4/4"
+  },
+  {
+   "id": "sonate_no_21_waldstein_1st_movement__s2",
+   "piece": "sonate-no-21-waldstein-1st-movement",
+   "measures": [
+    33,
+    48
+   ],
+   "n_notes": 262,
+   "n_labeled": 262,
+   "bar_ms": 2000,
+   "time_signature": "4/4"
+  },
+  {
+   "id": "sonate_no_21_waldstein_1st_movement__s3",
+   "piece": "sonate-no-21-waldstein-1st-movement",
+   "measures": [
+    49,
+    64
+   ],
+   "n_notes": 406,
+   "n_labeled": 406,
+   "bar_ms": 2000,
+   "time_signature": "4/4"
+  },
+  {
+   "id": "sonate_no_21_waldstein_1st_movement__s4",
+   "piece": "sonate-no-21-waldstein-1st-movement",
+   "measures": [
+    65,
+    80
+   ],
+   "n_notes": 381,
+   "n_labeled": 381,
    "bar_ms": 2000,
    "time_signature": "4/4"
   }

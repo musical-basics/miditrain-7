@@ -75,10 +75,16 @@ def parse_midi(path):
     return notes
 
 
-def parse_xml(path):
-    """Truth: per-note hands + measure structure, offsets at 120 BPM ms."""
+def parse_xml(path, expand=True):
+    """Truth: per-note hands + measure structure, offsets at 120 BPM ms.
+
+    expand: whether to run expandRepeats. Some exports render repeats
+    differently than music21 expands them, so main() tries both variants
+    and keeps whichever aligns with the MIDI better.
+    """
     score = converter.parse(path)
-    if score.recurse().getElementsByClass("Repeat"):
+    has_repeats = bool(score.recurse().getElementsByClass("Repeat"))
+    if expand and has_repeats:
         score = score.expandRepeats()
     parts = list(score.parts)
     if len(parts) != 2:
@@ -103,19 +109,37 @@ def parse_xml(path):
         raise ValueError("no time signature in the reference")
     bar_ql = float(ts.barDuration.quarterLength)
     bar_ms = round(bar_ql * MS_PER_QUARTER)
-    if float(measures[0].duration.quarterLength) < bar_ql:
-        raise ValueError(
-            f"pickup measure ({measures[0].duration.quarterLength} < {bar_ql} ql) "
-            "— pickup-free corpus required for now")
-    for m in measures[1:]:
+    for i, m in enumerate(measures[1:], start=1):
         if m.timeSignature and m.timeSignature.ratioString != ts.ratioString:
-            raise ValueError(f"mid-piece time signature change at measure {m.number}")
+            # keep the clean prefix instead of losing the piece — segments
+            # are windows anyway, and a mid-piece cadenza/TS change just
+            # ends the usable run
+            print(f"  time signature changes at measure {m.number} "
+                  f"({ts.ratioString} -> {m.timeSignature.ratioString}); "
+                  f"keeping measures before it")
+            measures = measures[:i]
+            break
+
+    # Pickup detection by OFFSET DELTA between the first measures — a
+    # measure's own .duration is the span of its contained notes, which
+    # is unreliable (the Waldstein's first FULL bar reports 0.5 ql).
+    # A leading pickup is simply trimmed: segmentation starts at the
+    # first full measure (downstream windows anchor on it), and the
+    # pickup's notes fall outside every window.
+    trimmed = 0
+    while len(measures) > 1 and (float(measures[1].offset) - float(measures[0].offset)
+                                 < bar_ql - 1e-6):
+        measures.pop(0)
+        trimmed += 1
+    if trimmed:
+        print(f"  pickup: trimmed {trimmed} leading partial measure(s), "
+              f"starting at measure {measures[0].number}")
 
     downbeats_ms = [round(float(m.offset) * MS_PER_QUARTER) for m in measures]
     # Even-grid check is PER SEGMENT WINDOW (in main), not whole-piece: one
     # irregular bar (volta quirk, engraving error) should only invalidate
     # the windows containing it, not the piece.
-    return truth_notes, downbeats_ms, bar_ms, ts.ratioString
+    return truth_notes, downbeats_ms, bar_ms, ts.ratioString, has_repeats
 
 
 def label_hands(midi_notes, truth_notes):
@@ -138,34 +162,17 @@ def label_hands(midi_notes, truth_notes):
     return hands, unmatched
 
 
-def main():
-    os.makedirs(OUT_DIR, exist_ok=True)
-    stems = sorted(
-        (os.path.splitext(f)[0], os.path.splitext(f)[1])
-        for f in os.listdir(SRC_DIR) if f.endswith((".musicxml", ".mxl")))
-    manifest = []
-    for stem, ext in stems:
-        xml = os.path.join(SRC_DIR, stem + ext)
-        mid = os.path.join(SRC_DIR, stem + ".mid")
-        if not os.path.exists(mid):
-            print(f"SKIP {stem}: no matching .mid")
-            continue
-        try:
-            truth_notes, downbeats_ms, bar_ms, ts = parse_xml(xml)
-        except ValueError as e:
-            print(f"SKIP {stem}: {e}")
-            continue
-        midi_notes = parse_midi(mid)
-        hands, unmatched = label_hands(midi_notes, truth_notes)
-
-        n_bars_total = len(downbeats_ms)
-        n_segments = n_bars_total // BARS_PER_SEGMENT
-        pslug = slug(stem)
-        print(f"{stem}: {len(midi_notes)} MIDI notes, {n_bars_total} bars, "
-              f"{ts}, bar={bar_ms}ms -> {n_segments} segments "
-              f"({unmatched} unmatched notes)")
-
-        for k in range(n_segments):
+def build_segments(stem, pslug, midi_notes, truth_notes, downbeats_ms,
+                   bar_ms, ts):
+    """All valid 16-bar segments for one (MIDI, truth-variant) pairing.
+    Returns (segments, log_lines)."""
+    hands, unmatched = label_hands(midi_notes, truth_notes)
+    n_segments = len(downbeats_ms) // BARS_PER_SEGMENT
+    segments, log = [], []
+    log.append(f"{stem}: {len(midi_notes)} MIDI notes, {len(downbeats_ms)} bars, "
+               f"{ts}, bar={bar_ms}ms -> {n_segments} windows "
+               f"({unmatched} unmatched notes)")
+    for k in range(n_segments):
             window = downbeats_ms[k * BARS_PER_SEGMENT:(k + 1) * BARS_PER_SEGMENT]
             # window anchors on its own first downbeat (an irregular bar
             # earlier in the piece shifts everything globally; the window
@@ -173,8 +180,8 @@ def main():
             start = window[0]
             end = start + BARS_PER_SEGMENT * bar_ms
             if [d - start for d in window] != [b * bar_ms for b in range(BARS_PER_SEGMENT)]:
-                print(f"  SKIP segment {k}: uneven measure grid inside bars "
-                      f"{k * BARS_PER_SEGMENT + 1}–{(k + 1) * BARS_PER_SEGMENT}")
+                log.append(f"  SKIP segment {k}: uneven measure grid inside bars "
+                           f"{k * BARS_PER_SEGMENT + 1}–{(k + 1) * BARS_PER_SEGMENT}")
                 continue
             idx = [i for i, n in enumerate(midi_notes)
                    if start <= n["onset_ms"] < end]
@@ -199,18 +206,68 @@ def main():
             }
             labeled = sum(1 for h in seg["truth"]["hand"] if h != "?")
             if not seg_notes or labeled / len(seg_notes) < 0.7:
-                print(f"  SKIP segment {k}: only {labeled}/{len(seg_notes)} notes "
-                      "truth-labeled (MIDI/XML desync?)")
+                log.append(f"  SKIP segment {k}: only {labeled}/{len(seg_notes)} "
+                           "notes truth-labeled (MIDI/XML desync?)")
                 continue
+            seg["_labeled"] = labeled
+            segments.append(seg)
+            log.append(f"  {seg['id']}: {len(seg_notes)} notes ({labeled} labeled)")
+    return segments, log
+
+
+def main():
+    os.makedirs(OUT_DIR, exist_ok=True)
+    stems = sorted(
+        (os.path.splitext(f)[0], os.path.splitext(f)[1])
+        for f in os.listdir(SRC_DIR) if f.endswith((".musicxml", ".mxl")))
+    manifest = []
+    for stem, ext in stems:
+        xml = os.path.join(SRC_DIR, stem + ext)
+        mid = os.path.join(SRC_DIR, stem + ".mid")
+        if not os.path.exists(mid):
+            print(f"SKIP {stem}: no matching .mid")
+            continue
+        midi_notes = parse_midi(mid)
+        pslug = slug(stem)
+
+        # Try repeat expansion both ways; keep whichever the MIDI agrees
+        # with (more surviving segments, then more labeled notes). Some
+        # exports take repeats differently than music21 expands them.
+        variants = []
+        for expand in (True, False):
+            try:
+                truth_notes, downbeats_ms, bar_ms, ts, has_repeats = \
+                    parse_xml(xml, expand)
+            except ValueError as e:
+                if expand:
+                    print(f"SKIP {stem}: {e}")
+                break
+            segs, log = build_segments(stem, pslug, midi_notes, truth_notes,
+                                       downbeats_ms, bar_ms, ts)
+            variants.append((len(segs), sum(s["_labeled"] for s in segs),
+                             expand, segs, log))
+            if not has_repeats:
+                break
+        if not variants:
+            continue
+        variants.sort(key=lambda v: (-v[0], -v[1]))
+        n_segs, n_labeled, expand, segs, log = variants[0]
+        for line in log:
+            print(line)
+        if len(variants) > 1:
+            print(f"  repeats: kept {'expanded' if expand else 'UNEXPANDED'} "
+                  f"variant ({n_segs} vs {variants[1][0]} segments)")
+        for seg in segs:
+            labeled = seg.pop("_labeled")
             out = os.path.join(OUT_DIR, seg["id"] + ".json")
             with open(out, "w") as f:
                 json.dump(seg, f)
             manifest.append({
                 "id": seg["id"], "piece": stem, "measures": seg["measures"],
-                "n_notes": len(seg_notes), "n_labeled": labeled,
-                "bar_ms": bar_ms, "time_signature": ts,
+                "n_notes": len(seg["notes"]), "n_labeled": labeled,
+                "bar_ms": seg["bar_ms"],
+                "time_signature": seg["truth"]["time_signature"],
             })
-            print(f"  {seg['id']}: {len(seg_notes)} notes ({labeled} labeled)")
 
     with open(os.path.join(OUT_DIR, "manifest.json"), "w") as f:
         json.dump({"ms_per_quarter": MS_PER_QUARTER,

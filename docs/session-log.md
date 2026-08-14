@@ -1,5 +1,58 @@
 # Session Log — miditrain-7
 
+## 2026-08-14 (evening) — All 9 pieces in (28 segments); the level-selection frontier is now mapped
+
+**Data fixes, all user-driven:**
+- **Waldstein has NO pickup — user was right.** The old detector read the
+  first measure's contained-note span (this file reports 0.5 ql for a
+  full bar); pickup detection now uses the OFFSET DELTA between measures.
+  Waldstein contributes 5 segments (8.5k-note movement).
+- **Op.9/2**: leading pickup is now TRIMMED (segmentation starts at the
+  first full measure — "start on measure 2"), and the mid-piece TS change
+  at m.33 (cadenza) truncates the piece instead of losing it → 2 segments
+  of 12/8, the corpus's first 3000 ms bars.
+- **Rage v2 MIDI measured: NOT better** (same desync curve as v1 —
+  unused). The desync is the XML side: music21's expandRepeats disagrees
+  with how both MIDIs take the repeats. The segmenter now tries BOTH
+  expansion variants per piece and keeps the one the MIDI agrees with
+  (more surviving segments): rage unexpanded → 4 clean segments,
+  waldstein unexpanded → 5.
+
+**Corpus: 9/9 pieces usable, 28 segments, 4 meters (4/4, 2/4, 6/8, 12/8).**
+
+**Scores** (Phase 2 re-tuned on the widened split — the sweep's winner IS
+the already-adopted config; no weight setting beats it):
+- Phase 1: 93.6% overall / 82.1% crossover pooled. New hardest segment:
+  Waldstein s0 (79.5%) — both hands pulsing chords in close position.
+- Phase 2: 92.4% recall / 86.4% precision, **21/28 strict**.
+
+**The 4 failing segments decompose cleanly — all are METRICAL-LEVEL
+errors on a correctly-found pulse** (tactus correct in 27/28):
+| segment | tactus | error |
+|---|---|---|
+| rage_s0 (2/4) | 502 ✓ | groups ×3 → 1500 bars |
+| rage_s2 (2/4) | 502 ✓ | groups ×4 → 2000 bars (doubling) |
+| op9no2 both (12/8) | 375 = eighth, not 750 | max G=4 can't reach 3000; halving |
+| waldstein_s4 (4/4) | **618 ✗** | first tactus failure in the corpus (dotted-rhythm chorale texture) |
+
+**Design conclusion (answers "is phase 2 well designed?"):** the grid
+search proves the CURRENT level-selection mechanism (accent-mass folding
++ bar-length prior + parsimony margin) is at its ceiling — 432 configs,
+none beats the adopted one, and the knobs trade meters against each
+other (loosen parsimony → 12/8 heals, 2/4 re-breaks). The accent
+channels reliably find the HIERARCHY but cannot pick the notated LEVEL,
+because at ambiguous levels the accents are self-similar by construction.
+The channels whose natural granularity IS the bar — harmonic RHYTHM
+(period of harmonic change: rage changes per 1000 ms, op9/2 per 3000 ms)
+and phrase PARALLELISM (repetition lag) — are not yet level voters.
+That redesign is the top open item, recorded in debt.
+
+**Streaming across 28 segments**: first-correct median still ~4.25 s;
+22/28 reach stable lock (median 10.25 s). The 6 never-locks are the 4
+level-error segments plus waldstein_s0/s2 wobble. Hysteresis tracker
+remains the standing next step.
+
+
 ## 2026-08-14 (later) — 5 new pieces; held-out truth-telling; streaming lock times
 
 **Corpus grew 4 → 7 usable pieces, 10 → 20 segments** (~5.6k scored

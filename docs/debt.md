@@ -1,13 +1,22 @@
 # Debt / open questions
 
-- **rage_s0 bar level** (2026-08-14): the opening of Rage Op.129 (2/4)
-  scores G=3/1500 ms above G=2/1000 even after the retune — the rondo
-  theme's agogic pattern apparently supports a triple fold. 1 of 20
-  segments; needs a channel-level diagnosis like the doubled-bar one.
-- **Rage MIDI/XML desync** (2026-08-14): the pair diverges progressively
-  (repeat structure in the MuseScore export); 26 of 29 windows dropped by
-  the ≥70%-labeled guard. Re-export the MIDI from the same score, or
-  accept 3 segments.
+- **Bar-LEVEL selection redesign** (2026-08-14, TOP ITEM): the sweep
+  proved the accent-folding + prior + parsimony mechanism is at its
+  ceiling (432 configs, none beats the adopted one; knobs trade meters
+  against each other). Design direction: level should be voted by
+  channels whose natural period IS the bar — harmonic rhythm (period of
+  pitch-class-set change) and phrase parallelism (repetition lag) — with
+  accent folding keeping phase duty. Also: groupings max G=4 cannot
+  express 12/8 from an eighth-note tactus (op9/2); the tactus/level
+  interaction needs to be joint, not sequential.
+- **waldstein_s4 tactus** (2026-08-14): first tactus failure in the
+  corpus (618 ms lock on a dotted-rhythm chorale texture, true 500).
+  Diagnose the fold scores around 500 vs 618.
+- **Rage/Waldstein MIDI/XML desync past the exposition** (2026-08-14):
+  both exports take repeats differently than music21 expands them; the
+  segmenter keeps the better variant but late-piece windows still drop.
+  Re-exporting MIDI+XML from the same MuseScore save would recover
+  ~40 more windows. Rage v2 MIDI measured identical to v1 — unused.
 - **Streaming hysteresis tracker** (2026-08-14): prefix replay shows
   first-correct at ~4.25 s but stability only at ~10 s because each
   prefix re-infers from scratch. Build the commit-horizon tracker (keep
