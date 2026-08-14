@@ -1,0 +1,4 @@
+# Only tools/make_segments.py needs these (Phase 0 truth extraction).
+# The pipeline itself (phase1/phase2/scorers/run_all) is pure stdlib.
+mido
+music21

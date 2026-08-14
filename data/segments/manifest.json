@@ -1,0 +1,126 @@
+{
+ "ms_per_quarter": 500.0,
+ "bars_per_segment": 16,
+ "segments": [
+  {
+   "id": "burgmuller_arabesque__s0",
+   "piece": "Burgmuller Arabesque Full Lesson Version",
+   "measures": [
+    1,
+    16
+   ],
+   "n_notes": 279,
+   "n_labeled": 279,
+   "bar_ms": 2000,
+   "time_signature": "4/4"
+  },
+  {
+   "id": "burgmuller_the_storm__s0",
+   "piece": "Burgmuller The Storm All Markings Version",
+   "measures": [
+    1,
+    16
+   ],
+   "n_notes": 293,
+   "n_labeled": 293,
+   "bar_ms": 2000,
+   "time_signature": "4/4"
+  },
+  {
+   "id": "burgmuller_the_storm__s1",
+   "piece": "Burgmuller The Storm All Markings Version",
+   "measures": [
+    17,
+    32
+   ],
+   "n_notes": 319,
+   "n_labeled": 307,
+   "bar_ms": 2000,
+   "time_signature": "4/4"
+  },
+  {
+   "id": "clementi_sonatina__s0",
+   "piece": "Clementi Sonatina All Markings Version",
+   "measures": [
+    1,
+    16
+   ],
+   "n_notes": 141,
+   "n_labeled": 141,
+   "bar_ms": 2000,
+   "time_signature": "4/4"
+  },
+  {
+   "id": "clementi_sonatina__s1",
+   "piece": "Clementi Sonatina All Markings Version",
+   "measures": [
+    17,
+    32
+   ],
+   "n_notes": 136,
+   "n_labeled": 136,
+   "bar_ms": 2000,
+   "time_signature": "4/4"
+  },
+  {
+   "id": "kuhlau_sonatina_1st_mvmt__s0",
+   "piece": "Kuhlau Sonatina 1st Mvmt Lesson Version v2",
+   "measures": [
+    1,
+    16
+   ],
+   "n_notes": 188,
+   "n_labeled": 188,
+   "bar_ms": 2000,
+   "time_signature": "4/4"
+  },
+  {
+   "id": "kuhlau_sonatina_1st_mvmt__s1",
+   "piece": "Kuhlau Sonatina 1st Mvmt Lesson Version v2",
+   "measures": [
+    17,
+    32
+   ],
+   "n_notes": 224,
+   "n_labeled": 224,
+   "bar_ms": 2000,
+   "time_signature": "4/4"
+  },
+  {
+   "id": "kuhlau_sonatina_1st_mvmt__s2",
+   "piece": "Kuhlau Sonatina 1st Mvmt Lesson Version v2",
+   "measures": [
+    33,
+    48
+   ],
+   "n_notes": 246,
+   "n_labeled": 246,
+   "bar_ms": 2000,
+   "time_signature": "4/4"
+  },
+  {
+   "id": "kuhlau_sonatina_1st_mvmt__s3",
+   "piece": "Kuhlau Sonatina 1st Mvmt Lesson Version v2",
+   "measures": [
+    49,
+    64
+   ],
+   "n_notes": 191,
+   "n_labeled": 191,
+   "bar_ms": 2000,
+   "time_signature": "4/4"
+  },
+  {
+   "id": "kuhlau_sonatina_1st_mvmt__s4",
+   "piece": "Kuhlau Sonatina 1st Mvmt Lesson Version v2",
+   "measures": [
+    65,
+    80
+   ],
+   "n_notes": 221,
+   "n_labeled": 204,
+   "bar_ms": 2000,
+   "time_signature": "4/4"
+  }
+ ]
+}

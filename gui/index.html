@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>miditrain-7 · phase inspector</title>
+<style>
+  :root {
+    --bg: #fafafa; --panel: #ffffff; --ink: #1c1e21; --muted: #6b7280;
+    --line: #e5e7eb; --accent: #111827;
+    --rh: #e8871e; --lh: #2f6fd6; --err: #dc2626; --truthline: #16a34a;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 14px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { display: flex; align-items: center; gap: 12px; padding: 10px 16px;
+           background: var(--panel); border-bottom: 1px solid var(--line);
+           position: sticky; top: 0; z-index: 5; flex-wrap: wrap; }
+  header h1 { font-size: 15px; margin: 0 8px 0 0; font-weight: 650; }
+  select, button { font: inherit; padding: 5px 9px; border: 1px solid var(--line);
+                   border-radius: 7px; background: var(--panel); color: var(--ink);
+                   cursor: pointer; }
+  select { min-width: 260px; }
+  .tabs { display: flex; gap: 4px; margin-left: auto; }
+  .tabs button { border-radius: 999px; padding: 5px 14px; }
+  .tabs button.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .toggle.active { background: #eef2ff; border-color: #c7d2fe; }
+  main { display: grid; grid-template-columns: 1fr 320px; gap: 14px; padding: 14px 16px; }
+  main > div { min-width: 0; }   /* let the roll column shrink; canvas scrolls inside */
+  .rollwrap { background: var(--panel); border: 1px solid var(--line);
+              border-radius: 10px; overflow-x: auto; position: relative; }
+  canvas { display: block; }
+  aside .card { background: var(--panel); border: 1px solid var(--line);
+                border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
+  aside h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em;
+             color: var(--muted); margin: 0 0 8px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13px; }
+  td, th { padding: 3px 6px; text-align: right; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 500; }
+  td:first-child, th:first-child { text-align: left; }
+  .big { font-size: 22px; font-weight: 700; }
+  .ok { color: var(--truthline); } .bad { color: var(--err); }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; font-size: 12.5px;
+            color: var(--muted); margin-top: 8px; }
+  .sw { display: inline-block; width: 11px; height: 11px; border-radius: 3px;
+        vertical-align: -1px; margin-right: 5px; }
+  #tip { position: fixed; pointer-events: none; background: #111827; color: #f9fafb;
+         padding: 6px 9px; border-radius: 7px; font-size: 12px; display: none;
+         z-index: 20; white-space: pre; }
+  .note-caveat { font-size: 12px; color: var(--muted); margin-top: 6px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>miditrain-7</h1>
+  <button id="prev">‹</button>
+  <select id="segsel"></select>
+  <button id="next">›</button>
+  <button id="truthbtn" class="toggle">show truth</button>
+  <div class="tabs">
+    <button id="tab1" class="active">Phase 1 · Hands</button>
+    <button id="tab2">Phase 2 · Downbeats</button>
+  </div>
+</header>
+<main>
+  <div>
+    <div class="rollwrap"><canvas id="roll"></canvas></div>
+    <div class="legend" id="legend"></div>
+  </div>
+  <aside id="side"></aside>
+</main>
+<div id="tip"></div>
+<script>
+const $ = id => document.getElementById(id);
+const state = { manifest: null, report: null, seg: null, p1: null, p2: null,
+                phase: 1, showTruth: false, id: null };
+const PX_PER_SEC = 42, TOP = 26, BOTTOM = 10;
+
+async function fetchJSON(url) {
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(url + " -> " + r.status);
+  return r.json();
+}
+
+async function boot() {
+  state.manifest = await fetchJSON("../data/segments/manifest.json");
+  state.report = await fetchJSON("../data/runs/report.json");
+  const sel = $("segsel");
+  state.manifest.segments.forEach(s => {
+    const o = document.createElement("option");
+    o.value = s.id;
+    o.textContent = `${s.id}  (bars ${s.measures[0]}–${s.measures[1]}, ${s.n_notes} notes)`;
+    sel.appendChild(o);
+  });
+  sel.onchange = () => load(sel.value);
+  $("prev").onclick = () => step(-1);
+  $("next").onclick = () => step(1);
+  $("tab1").onclick = () => setPhase(1);
+  $("tab2").onclick = () => setPhase(2);
+  $("truthbtn").onclick = () => {
+    state.showTruth = !state.showTruth;
+    $("truthbtn").classList.toggle("active", state.showTruth);
+    render();
+  };
+  load(state.manifest.segments[0].id);
+}
+
+function step(d) {
+  const ids = state.manifest.segments.map(s => s.id);
+  const i = (ids.indexOf(state.id) + d + ids.length) % ids.length;
+  $("segsel").value = ids[i];
+  load(ids[i]);
+}
+
+function setPhase(p) {
+  state.phase = p;
+  $("tab1").classList.toggle("active", p === 1);
+  $("tab2").classList.toggle("active", p === 2);
+  render();
+}
+
+async function load(id) {
+  state.id = id;
+  [state.seg, state.p1, state.p2] = await Promise.all([
+    fetchJSON(`../data/segments/${id}.json`),
+    fetchJSON(`../data/runs/${id}.phase1.json`),
+    fetchJSON(`../data/runs/${id}.phase2.json`),
+  ]);
+  render();
+}
+
+function noteName(p) {
+  const N = ["C","C#","D","Eb","E","F","F#","G","Ab","A","Bb","B"];
+  return N[p % 12] + (Math.floor(p / 12) - 1);
+}
+
+function layout() {
+  const seg = state.seg;
+  const span = seg.n_bars * seg.bar_ms;
+  const pitches = seg.notes.map(n => n.pitch);
+  const lo = Math.min(...pitches) - 2, hi = Math.max(...pitches) + 2;
+  const rowH = Math.max(5, Math.min(9, Math.floor(560 / (hi - lo + 1))));
+  const W = Math.round(span / 1000 * PX_PER_SEC) + 20;
+  const H = TOP + (hi - lo + 1) * rowH + BOTTOM;
+  return { span, lo, hi, rowH, W, H,
+           x: t => 10 + t / 1000 * PX_PER_SEC,
+           y: p => TOP + (hi - p) * rowH };
+}
+
+function render() {
+  const { seg, p1, p2 } = state;
+  if (!seg) return;
+  const L = layout();
+  const cv = $("roll");
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = L.W * dpr; cv.height = L.H * dpr;
+  cv.style.width = L.W + "px"; cv.style.height = L.H + "px";
+  const g = cv.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.fillStyle = "#fff";
+  g.fillRect(0, 0, L.W, L.H);
+
+  // crossover band (phase 1): where both true hands are active
+  if (state.phase === 1) {
+    const rh = [], lh = [];
+    seg.notes.forEach((n, i) => {
+      const h = seg.truth.hand[i];
+      if (h === "R") rh.push(n.pitch); else if (h === "L") lh.push(n.pitch);
+    });
+    if (rh.length && lh.length) {
+      const bandLo = Math.min(...rh), bandHi = Math.max(...lh);
+      if (bandLo <= bandHi) {
+        g.fillStyle = "rgba(250, 204, 21, 0.13)";
+        g.fillRect(0, L.y(bandHi) - 1, L.W, (bandHi - bandLo + 1) * L.rowH);
+      }
+    }
+  }
+
+  // truth bar grid + numbers
+  g.textAlign = "left"; g.font = "11px sans-serif";
+  seg.truth.downbeats_ms.forEach((t, i) => {
+    const x = L.x(t);
+    g.strokeStyle = state.phase === 2 ? "rgba(22,163,74,.55)" : "#eceef1";
+    g.lineWidth = 1;
+    if (state.phase === 2) g.setLineDash([5, 4]);
+    g.beginPath(); g.moveTo(x, TOP - 8); g.lineTo(x, L.H - 4); g.stroke();
+    g.setLineDash([]);
+    g.fillStyle = "#9ca3af";
+    g.fillText(String(seg.measures[0] + i), x + 3, 12);
+  });
+
+  // predicted downbeats (phase 2)
+  if (state.phase === 2 && p2) {
+    const truth = seg.truth.downbeats_ms;
+    p2.downbeats_ms.forEach(t => {
+      const matched = truth.some(u => Math.abs(u - t) <= 50);
+      const x = L.x(t);
+      g.strokeStyle = matched ? "rgba(17,24,39,.8)" : "rgba(220,38,38,.9)";
+      g.lineWidth = matched ? 1.6 : 2.2;
+      g.beginPath(); g.moveTo(x, TOP - 2); g.lineTo(x, L.H - 4); g.stroke();
+    });
+  }
+
+  // notes
+  seg.notes.forEach((n, i) => {
+    const truth = seg.truth.hand[i];
+    const pred = p1.hand[i];
+    const hand = state.showTruth ? truth : pred;
+    const wrong = truth !== "?" && pred !== truth;
+    const x = L.x(n.onset_ms), w = Math.max(3, n.duration_ms / 1000 * PX_PER_SEC - 1);
+    const y = L.y(n.pitch);
+    let fill = hand === "L" ? "var(--lh)" : hand === "R" ? "var(--rh)" : "#9ca3af";
+    fill = hand === "L" ? "#2f6fd6" : hand === "R" ? "#e8871e" : "#9ca3af";
+    if (state.phase === 2) fill = hand === "L" ? "#93b6ea" : "#f0bd85";
+    g.fillStyle = fill;
+    g.beginPath(); g.roundRect(x, y, w, L.rowH - 1.5, 2); g.fill();
+    if (state.phase === 1 && wrong && !state.showTruth) {
+      g.strokeStyle = "#dc2626"; g.lineWidth = 1.8;
+      g.beginPath(); g.roundRect(x - .5, y - .5, w + 1, L.rowH - .5, 2); g.stroke();
+    }
+  });
+
+  renderLegend();
+  renderSide();
+  bindTip(cv, L);
+}
+
+function renderLegend() {
+  const l = $("legend");
+  if (state.phase === 1) {
+    l.innerHTML =
+      `<span><span class="sw" style="background:#e8871e"></span>right hand</span>
+       <span><span class="sw" style="background:#2f6fd6"></span>left hand</span>
+       <span><span class="sw" style="background:#fff;border:2px solid #dc2626"></span>wrong hand</span>
+       <span><span class="sw" style="background:rgba(250,204,21,.35)"></span>crossover band (both hands active — the hard region)</span>
+       <span>coloring: ${state.showTruth ? "TRUTH" : "prediction"}</span>`;
+  } else {
+    l.innerHTML =
+      `<span><span class="sw" style="background:#16a34a"></span>truth downbeat (dashed)</span>
+       <span><span class="sw" style="background:#111827"></span>inferred downbeat</span>
+       <span><span class="sw" style="background:#dc2626"></span>inferred, no truth match</span>
+       <span>notes tinted by inferred hand</span>`;
+  }
+}
+
+function pct(v) { return v == null ? "–" : (v * 100).toFixed(1) + "%"; }
+
+function renderSide() {
+  const rep = state.report.segments[state.id];
+  const aggr = state.report.aggregate;
+  const side = $("side");
+  if (state.phase === 1) {
+    const rows = ["prediction", "oracle*", "split@60"].map(k => {
+      const r = rep.phase1[k];
+      return `<tr><td>${k}</td><td>${pct(r.accuracy)}</td>
+              <td>${r.crossover ? pct(r.crossover.accuracy) : "n/a"}</td>
+              <td>${r.switches}</td></tr>`;
+    }).join("");
+    const a = aggr.phase1.prediction;
+    side.innerHTML = `
+      <div class="card"><h2>Phase 1 — this segment</h2>
+        <div class="big">${pct(rep.phase1.prediction.accuracy)}</div>
+        <table><tr><th>model</th><th>overall</th><th>crossover</th><th>switches</th></tr>${rows}</table>
+        <div class="note-caveat">* oracle = best fixed pitch split for this segment,
+        chosen knowing the answer — the ceiling for any pitch-only rule.</div>
+      </div>
+      <div class="card"><h2>Phase 1 — all segments</h2>
+        <table>
+          <tr><td>overall</td><td>${pct(a.accuracy)}</td></tr>
+          <tr><td>crossover</td><td>${pct(a.crossover_accuracy)}</td></tr>
+          <tr><td>right hand</td><td>${pct(a.R)}</td></tr>
+          <tr><td>left hand</td><td>${pct(a.L)}</td></tr>
+          <tr><td>switches in a true hand</td><td>${a.switches}</td></tr>
+        </table>
+      </div>`;
+  } else {
+    const r = rep.phase2, a = aggr.phase2;
+    side.innerHTML = `
+      <div class="card"><h2>Phase 2 — this segment</h2>
+        <div class="big ${r.strict ? "ok" : "bad"}">${r.strict ? "strict ✓" : pct(r.recall)}</div>
+        <table>
+          <tr><td>recall</td><td>${pct(r.recall)}</td></tr>
+          <tr><td>precision</td><td>${pct(r.precision)}</td></tr>
+          <tr><td>matched / missed / extra</td><td>${r.tp} / ${r.fn} / ${r.fp}</td></tr>
+          <tr><td>inferred bar</td><td>${r.bar_ms.toFixed(0)} ms</td></tr>
+          <tr><td>beats per bar</td><td>${r.beats_per_bar}</td></tr>
+          <tr><td>tactus</td><td>${r.tactus_ms.toFixed(1)} ms</td></tr>
+          <tr><td>bar phase</td><td>${r.bar_phase_ms.toFixed(0)} ms</td></tr>
+          <tr><td>truth bar</td><td>${state.seg.bar_ms} ms · ${state.seg.truth.time_signature}</td></tr>
+        </table>
+      </div>
+      <div class="card"><h2>Phase 2 — all segments</h2>
+        <div class="big ${a.recall >= 0.98 ? "ok" : "bad"}">${pct(a.recall)} recall</div>
+        <table>
+          <tr><td>north star</td><td>≥ 98%</td></tr>
+          <tr><td>precision</td><td>${pct(a.precision)}</td></tr>
+          <tr><td>strict segments</td><td>${a.strict}/${a.n}</td></tr>
+        </table>
+      </div>`;
+  }
+}
+
+function bindTip(cv, L) {
+  const tip = $("tip");
+  cv.onmousemove = e => {
+    const r = cv.getBoundingClientRect();
+    const mx = e.clientX - r.left, my = e.clientY - r.top;
+    const hit = state.seg.notes.findIndex((n, i) => {
+      const x = L.x(n.onset_ms), w = Math.max(3, n.duration_ms / 1000 * PX_PER_SEC - 1);
+      const y = L.y(n.pitch);
+      return mx >= x && mx <= x + w && my >= y && my <= y + L.rowH;
+    });
+    if (hit < 0) { tip.style.display = "none"; return; }
+    const n = state.seg.notes[hit];
+    tip.textContent =
+      `${noteName(n.pitch)}  (${n.pitch})\n` +
+      `t=${n.onset_ms} ms  dur=${n.duration_ms} ms  vel=${n.velocity}\n` +
+      `truth: ${state.seg.truth.hand[hit]}   predicted: ${state.p1.hand[hit]}`;
+    tip.style.display = "block";
+    tip.style.left = (e.clientX + 14) + "px";
+    tip.style.top = (e.clientY + 14) + "px";
+  };
+  cv.onmouseleave = () => { tip.style.display = "none"; };
+}
+
+boot().catch(e => {
+  document.body.insertAdjacentHTML("beforeend",
+    `<p style="padding:20px;color:#dc2626">Failed to load: ${e.message}.<br>
+     Run <code>python3 run_all.py</code> first, and serve the REPO ROOT
+     (<code>./run_gui.sh</code>), not the gui/ folder.</p>`);
+});
+</script>
+</body>
+</html>
