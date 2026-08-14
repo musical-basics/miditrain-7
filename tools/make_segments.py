@@ -112,11 +112,9 @@ def parse_xml(path):
             raise ValueError(f"mid-piece time signature change at measure {m.number}")
 
     downbeats_ms = [round(float(m.offset) * MS_PER_QUARTER) for m in measures]
-    # sanity: even grid
-    for i, d in enumerate(downbeats_ms):
-        if d != i * bar_ms:
-            raise ValueError(f"uneven measure grid at index {i}: {d} != {i * bar_ms}")
-
+    # Even-grid check is PER SEGMENT WINDOW (in main), not whole-piece: one
+    # irregular bar (volta quirk, engraving error) should only invalidate
+    # the windows containing it, not the piece.
     return truth_notes, downbeats_ms, bar_ms, ts.ratioString
 
 
@@ -142,11 +140,12 @@ def label_hands(midi_notes, truth_notes):
 
 def main():
     os.makedirs(OUT_DIR, exist_ok=True)
-    stems = sorted(os.path.splitext(f)[0] for f in os.listdir(SRC_DIR)
-                   if f.endswith(".musicxml"))
+    stems = sorted(
+        (os.path.splitext(f)[0], os.path.splitext(f)[1])
+        for f in os.listdir(SRC_DIR) if f.endswith((".musicxml", ".mxl")))
     manifest = []
-    for stem in stems:
-        xml = os.path.join(SRC_DIR, stem + ".musicxml")
+    for stem, ext in stems:
+        xml = os.path.join(SRC_DIR, stem + ext)
         mid = os.path.join(SRC_DIR, stem + ".mid")
         if not os.path.exists(mid):
             print(f"SKIP {stem}: no matching .mid")
@@ -167,8 +166,16 @@ def main():
               f"({unmatched} unmatched notes)")
 
         for k in range(n_segments):
-            start = k * BARS_PER_SEGMENT * bar_ms
+            window = downbeats_ms[k * BARS_PER_SEGMENT:(k + 1) * BARS_PER_SEGMENT]
+            # window anchors on its own first downbeat (an irregular bar
+            # earlier in the piece shifts everything globally; the window
+            # only needs to be internally even)
+            start = window[0]
             end = start + BARS_PER_SEGMENT * bar_ms
+            if [d - start for d in window] != [b * bar_ms for b in range(BARS_PER_SEGMENT)]:
+                print(f"  SKIP segment {k}: uneven measure grid inside bars "
+                      f"{k * BARS_PER_SEGMENT + 1}–{(k + 1) * BARS_PER_SEGMENT}")
+                continue
             idx = [i for i, n in enumerate(midi_notes)
                    if start <= n["onset_ms"] < end]
             seg_notes = []
@@ -190,10 +197,14 @@ def main():
                     "hand": [hands[i] for i in idx],
                 },
             }
+            labeled = sum(1 for h in seg["truth"]["hand"] if h != "?")
+            if not seg_notes or labeled / len(seg_notes) < 0.7:
+                print(f"  SKIP segment {k}: only {labeled}/{len(seg_notes)} notes "
+                      "truth-labeled (MIDI/XML desync?)")
+                continue
             out = os.path.join(OUT_DIR, seg["id"] + ".json")
             with open(out, "w") as f:
                 json.dump(seg, f)
-            labeled = sum(1 for h in seg["truth"]["hand"] if h != "?")
             manifest.append({
                 "id": seg["id"], "piece": stem, "measures": seg["measures"],
                 "n_notes": len(seg_notes), "n_labeled": labeled,

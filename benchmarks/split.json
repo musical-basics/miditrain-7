@@ -1,0 +1,13 @@
+{
+ "val": [
+  "burgmuller_the_storm__s1",
+  "clementi_sonatina__s1",
+  "kuhlau_sonatina_1st_mvmt__s1",
+  "kuhlau_sonatina_1st_mvmt__s4",
+  "chopin_nocturne_in_d_flat_major_op_27_no_2__s1",
+  "chopin_nocturne_in_d_flat_major_op_27_no_2__s3",
+  "nocturne_opus_72_no_1_in_e_minor__s1",
+  "beethoven_rage_over_a_lost_penny__s2"
+ ],
+ "note": "train = all other segments; segment-level stratified, piece leakage disclosed"
+}

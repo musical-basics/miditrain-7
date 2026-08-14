@@ -1,5 +1,54 @@
 # Session Log — miditrain-7
 
+## 2026-08-14 (later) — 5 new pieces; held-out truth-telling; streaming lock times
+
+**Corpus grew 4 → 7 usable pieces, 10 → 20 segments** (~5.6k scored
+notes). New: Chopin Nocturne Op.27/2 (6/8 — first compound meter, 4
+segs), Chopin Op.72/1 (4/4, 3 segs), Beethoven Rage Op.129 (2/4, 3 segs).
+Skipped loudly per current scope: Op.9/2 + Waldstein (pickup measures).
+The new MIDIs are voice-separated (hands on separate tracks) — the
+ingest already merges all tracks into one stream and discards track
+identity, so the engine never sees the separation; truth comes from the
+XML part index as before. Segmenter now reads .mxl, anchors each 16-bar
+window on its own first downbeat (one irregular bar no longer kills the
+rest of the piece), and drops windows with <70% truth-labeled notes.
+KNOWN DATA ISSUE: the Rage MIDI/XML pair desyncs progressively (repeat
+structure); only 3 of its 29 windows survive the guards.
+
+**Held-out test (params untouched from the 4-piece tune):**
+- Phase 1 GENERALIZES: Rage 100%×3, nocturnes 87.7–99.0%. Pooled
+  96.0% / 87.8% crossover.
+- Phase 2 failed systematically on non-4/4: every 4/4 segment stayed
+  strict, but 2/4 and 6/8 locked to DOUBLED bars (Rage 43.8%, Op.27/2
+  50% recall). Root causes found by channel-level diagnosis:
+  1. BUG: one-shot entry votes divided by n_lines mechanically inflate
+     longer bars. Fix: point evidence picks the PHASE, never the LEVEL.
+  2. The 1900 ms bar prior penalizes real 1000/1500 ms bars.
+  3. A contrast-vs-other-beats score was tried and REJECTED (it punishes
+     4/4's legitimately strong beat 3 — broke The Storm).
+  Plus: least-squares grid refinement added (fixes the ~0.4% tactus
+  quantization drift AND the old ~18 ms phase bias — phases now lock at
+  0–2 ms); refinement window = fold tolerance, not ±10% of bar (a wide
+  window drags phase onto ornament mass).
+
+**Retune on a committed train/val split** (benchmarks/split.json,
+segment-stratified, piece leakage disclosed): winner is parsimony
+1.12→1.3 + agogic 1.5→0.75 + velocity_margin 2 — train F1 95.8 (10/12
+strict), **val F1 100 (8/8 strict)**. Full corpus after adoption:
+**recall 96.6%, precision 98.4%, 18/20 strict**. Remaining failures:
+rage_s0 picks G=3/1500 in 2/4 (open — see debt), op72_s2 misses 1 of 16.
+
+**Streaming ("how long is the ambiguous opening?")** —
+tools/measure_lock.py, prefix replay with durations capped at now:
+- **First correct grid: median 4.25 s (~2 bars), range 3.25–6 s**;
+  19/20 segments lock (rage_s0's grid is wrong even offline).
+- Stable lock without inertia: median 10.25 s, worst 31 s — from-scratch
+  re-inference wobbles after first-correct. NEXT: a hysteresis tracker
+  (keep the grid unless beaten by a margin); lock.json is its eval.
+- Hands need almost no hindsight: causal within ~2 pp of offline
+  everywhere except the Arabesque's symmetric texture (86.4 vs 93.5).
+
+
 ## 2026-08-14 — Repo born: Phase 0/1/2 built, measured, GUI verified
 
 **Why this repo exists** (user's call): miditrain-6's parameters were

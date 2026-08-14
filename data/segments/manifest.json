@@ -121,6 +121,126 @@
    "n_labeled": 204,
    "bar_ms": 2000,
    "time_signature": "4/4"
+  },
+  {
+   "id": "beethoven_rage_over_a_lost_penny__s0",
+   "piece": "beethoven-rage-over-a-lost-penny",
+   "measures": [
+    1,
+    16
+   ],
+   "n_notes": 294,
+   "n_labeled": 278,
+   "bar_ms": 1000,
+   "time_signature": "2/4"
+  },
+  {
+   "id": "beethoven_rage_over_a_lost_penny__s2",
+   "piece": "beethoven-rage-over-a-lost-penny",
+   "measures": [
+    33,
+    48
+   ],
+   "n_notes": 271,
+   "n_labeled": 194,
+   "bar_ms": 1000,
+   "time_signature": "2/4"
+  },
+  {
+   "id": "beethoven_rage_over_a_lost_penny__s6",
+   "piece": "beethoven-rage-over-a-lost-penny",
+   "measures": [
+    97,
+    112
+   ],
+   "n_notes": 286,
+   "n_labeled": 211,
+   "bar_ms": 1000,
+   "time_signature": "2/4"
+  },
+  {
+   "id": "chopin_nocturne_in_d_flat_major_op_27_no_2__s0",
+   "piece": "chopin-nocturne-in-d-flat-major-op-27-no-2",
+   "measures": [
+    1,
+    16
+   ],
+   "n_notes": 403,
+   "n_labeled": 392,
+   "bar_ms": 1500,
+   "time_signature": "6/8"
+  },
+  {
+   "id": "chopin_nocturne_in_d_flat_major_op_27_no_2__s1",
+   "piece": "chopin-nocturne-in-d-flat-major-op-27-no-2",
+   "measures": [
+    17,
+    32
+   ],
+   "n_notes": 324,
+   "n_labeled": 322,
+   "bar_ms": 1500,
+   "time_signature": "6/8"
+  },
+  {
+   "id": "chopin_nocturne_in_d_flat_major_op_27_no_2__s2",
+   "piece": "chopin-nocturne-in-d-flat-major-op-27-no-2",
+   "measures": [
+    33,
+    48
+   ],
+   "n_notes": 426,
+   "n_labeled": 408,
+   "bar_ms": 1500,
+   "time_signature": "6/8"
+  },
+  {
+   "id": "chopin_nocturne_in_d_flat_major_op_27_no_2__s3",
+   "piece": "chopin-nocturne-in-d-flat-major-op-27-no-2",
+   "measures": [
+    49,
+    64
+   ],
+   "n_notes": 444,
+   "n_labeled": 416,
+   "bar_ms": 1500,
+   "time_signature": "6/8"
+  },
+  {
+   "id": "nocturne_opus_72_no_1_in_e_minor__s0",
+   "piece": "nocturne-opus-72-no-1-in-e-minor",
+   "measures": [
+    1,
+    16
+   ],
+   "n_notes": 300,
+   "n_labeled": 300,
+   "bar_ms": 2000,
+   "time_signature": "4/4"
+  },
+  {
+   "id": "nocturne_opus_72_no_1_in_e_minor__s1",
+   "piece": "nocturne-opus-72-no-1-in-e-minor",
+   "measures": [
+    17,
+    32
+   ],
+   "n_notes": 303,
+   "n_labeled": 302,
+   "bar_ms": 2000,
+   "time_signature": "4/4"
+  },
+  {
+   "id": "nocturne_opus_72_no_1_in_e_minor__s2",
+   "piece": "nocturne-opus-72-no-1-in-e-minor",
+   "measures": [
+    33,
+    48
+   ],
+   "n_notes": 400,
+   "n_labeled": 395,
+   "bar_ms": 2000,
+   "time_signature": "4/4"
   }
  ]
 }

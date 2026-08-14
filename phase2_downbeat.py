@@ -43,12 +43,19 @@ Decision:
   1. Tactus: folded-mass search over log-spaced periods 240–1200 ms with
      a log-Gaussian prior around 600 ms (sigma in octaves — miditrain-6's
      corpus-searched shape), then ±3% fine refinement.
-  2. Bar: grouping G ∈ {2,3,4,6} × phase k·P over the STRUCTURAL
-     channels (bass/chord/agogic), mass normalized per grid line so
-     different G compete fairly; larger G must beat G=2 by a parsimony
-     margin. Phase is a free variable — an eventual pickup measure costs
-     nothing by construction.
-  3. Downbeats projected rigidly from (bar_ms, phase) across the segment.
+  2. Bar: grouping G ∈ {2,3,4} × phase k·P. LEVEL (which G) is chosen
+     on the PERIODIC structural channels only, per-line normalized, with
+     a bar-length prior and a parsimony margin; PHASE within the chosen
+     level additionally counts the one-shot entry votes. Point evidence
+     must never pick the level: a single vote divided by n_lines
+     mechanically inflates longer bars (measured: the entry channel
+     alone flipped a 2/4 and a 6/8 piece to doubled bars). A
+     contrast-vs-other-beats score was tried and measured OUT (it
+     punishes 4/4 for having a legitimately strong beat 3).
+  3. Downbeats projected from (bar_ms, phase), then (period, phase)
+     refined by least squares against the onset votes the grid captured
+     (kills the ~0.4% tactus quantization drift that walked late bars
+     out of tolerance on long 2/4 segments).
 
 Pure stdlib. Library: infer_downbeats(notes, hands) -> dict.
 CLI: python3 phase2_downbeat.py <segment.json> [out.json]  (runs Phase 1
@@ -67,20 +74,23 @@ PARAMS = {
     "tactus_prior_center_ms": 600.0,
     "tactus_prior_sigma_oct": 0.9,     # miditrain-6 corpus-searched value
     "fold_tol_frac": 0.06,      # vote counts if within this fraction of P
+    # Grid-searched 2026-08-14 on the committed train/val split
+    # (benchmarks/split.json): train F1 95.8 (10/12 strict), val F1 100
+    # (8/8 strict). Key lever vs the first tune: parsimony 1.12 -> 1.3.
     "groupings": (2, 3, 4),
-    "parsimony_margin": 1.12,   # larger G must beat G=2 by this factor
+    "parsimony_margin": 1.3,    # larger G must beat G=2 by this factor
     "bar_prior_center_ms": 1900.0,     # miditrain-6 corpus-searched values
     "bar_prior_sigma_oct": 1.4,
     "w_onset": 1.0,
     "w_bass": 3.0,
     "w_chord": 1.5,
-    "w_agogic": 1.5,
+    "w_agogic": 0.75,
     "w_velocity": 0.5,
     "w_harmony": 3.0,
     "harmony_min_dist": 0.35,   # Jaccard distance below this = no vote
     "w_entry": 2.0,
     "agogic_ratio": 1.8,        # duration > ratio × local median = accent
-    "velocity_margin": 8,       # velocity above local mean = accent
+    "velocity_margin": 2,       # velocity above the SAME HAND's local mean
     "local_window_ms": 3000.0,
 }
 
@@ -241,14 +251,23 @@ def _tactus(votes, p):
 
 
 def _bar(votes, tactus_ms, tactus_phase, span_ms, p):
-    structural = (votes["bass"] + votes["chord"] + votes["agogic"]
-                  + votes["velocity"] + votes["harmony"] + votes["entry"])
+    periodic = (votes["bass"] + votes["chord"] + votes["agogic"]
+                + votes["velocity"] + votes["harmony"])
     tol = p["fold_tol_frac"] * tactus_ms
 
     def bar_prior(bar):
         octs = math.log2(bar / p["bar_prior_center_ms"])
         return math.exp(-0.5 * (octs / p["bar_prior_sigma_oct"]) ** 2)
 
+    def folded(vote_list, phase, bar):
+        mass = 0.0
+        for v in vote_list:
+            d = (v["t"] - phase) % bar
+            if d <= tol or bar - d <= tol:
+                mass += v["w"]
+        return mass
+
+    # level: periodic evidence only, per-line normalized
     results = {}
     for g in p["groupings"]:
         bar = g * tactus_ms
@@ -256,24 +275,64 @@ def _bar(votes, tactus_ms, tactus_phase, span_ms, p):
         best = (0.0, tactus_phase)
         for k in range(g):
             phase = (tactus_phase + k * tactus_ms) % bar
-            mass = 0.0
-            for v in structural:
-                d = (v["t"] - phase) % bar
-                if d <= tol or bar - d <= tol:
-                    mass += v["w"]
-            per_line = mass / n_lines * bar_prior(bar)
+            per_line = folded(periodic, phase, bar) / n_lines * bar_prior(bar)
             if per_line > best[0]:
                 best = (per_line, phase)
         results[g] = best
     base = results[2][0] or 1e-9
-    g_win, (s_win, phase_win) = 2, results[2]
+    g_win, (s_win, _) = 2, results[2]
     for g in p["groupings"]:
         if g == 2:
             continue
-        margin = p["parsimony_margin"] * (1.0 if g % 2 == 0 else 1.0)
-        if results[g][0] > margin * base and results[g][0] > s_win:
-            g_win, (s_win, phase_win) = g, results[g]
+        if results[g][0] > p["parsimony_margin"] * base and results[g][0] > s_win:
+            g_win, (s_win, _) = g, results[g]
+
+    # phase within the level: periodic + one-shot entry votes, raw mass
+    bar = g_win * tactus_ms
+    phase_win, best_mass = tactus_phase, -1.0
+    for k in range(g_win):
+        phase = (tactus_phase + k * tactus_ms) % bar
+        mass = folded(periodic + votes["entry"], phase, bar)
+        if mass > best_mass:
+            best_mass, phase_win = mass, phase
     return g_win, phase_win
+
+
+def _refine_grid(bar_ms, phase, votes, span_ms, p):
+    """Weighted least-squares fit of the downbeat grid to the votes it
+    captures. The discrete period search quantizes at ~0.25%, which
+    accumulates to real drift over 16 bars; the votes themselves hold the
+    exact timing. Two iterations; correction bounded to ±1% per pass."""
+    all_votes = sorted(((v["t"], v["w"]) for vs in votes.values() for v in vs))
+    for _ in range(2):
+        tol = p["fold_tol_frac"] * bar_ms / 2.0
+        k_first = int((-(phase % bar_ms)) // bar_ms) - 1
+        pts = []           # (k, mass-weighted mean time, weight)
+        k = k_first
+        while phase + k * bar_ms < span_ms + tol:
+            center = phase + k * bar_ms
+            wsum = tsum = 0.0
+            for t, w in all_votes:
+                if abs(t - center) <= tol:
+                    wsum += w
+                    tsum += t * w
+            if wsum > 0:
+                pts.append((k, tsum / wsum, wsum))
+            k += 1
+        if len(pts) < 3:
+            return bar_ms, phase
+        sw = sum(w for _, _, w in pts)
+        mk = sum(k * w for k, _, w in pts) / sw
+        mt = sum(t * w for _, t, w in pts) / sw
+        num = sum(w * (k - mk) * (t - mt) for k, t, w in pts)
+        den = sum(w * (k - mk) ** 2 for k, _, w in pts)
+        if den <= 0:
+            return bar_ms, phase
+        b = num / den
+        b = max(bar_ms * 0.99, min(bar_ms * 1.01, b))
+        phase = mt - b * mk
+        bar_ms = b
+    return bar_ms, phase
 
 
 def infer_downbeats(notes, hands, params=None):
@@ -287,6 +346,7 @@ def infer_downbeats(notes, hands, params=None):
     span = max(n["onset_ms"] + n["duration_ms"] for n in notes)
     g, bar_phase = _bar(votes, tactus_ms, tactus_phase, span, p)
     bar_ms = g * tactus_ms
+    bar_ms, bar_phase = _refine_grid(bar_ms, bar_phase, votes, span, p)
 
     first = bar_phase % bar_ms
     # walk back so the grid covers the segment from the top
