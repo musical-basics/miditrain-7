@@ -11,7 +11,15 @@
   "beethoven_rage_over_a_lost_penny__s1",
   "chopin_nocturne_op_9_no_2_e_flat_major__s1",
   "sonate_no_21_waldstein_1st_movement__s1",
-  "sonate_no_21_waldstein_1st_movement__s4"
+  "sonate_no_21_waldstein_1st_movement__s4",
+  "waltz_in_a_minorchopin__s1",
+  "waltz_in_a_minorchopin__s3",
+  "waltz_opus_64_no_2_in_c_minor__s3",
+  "waltz_opus_64_no_2_in_c_minor__s7",
+  "waltz_opus_64_no_2_in_c_minor__s10",
+  "grieg_waltz_op_12_no_2__s2",
+  "liszt_hungarian_rhapsody_no_2__s3",
+  "liszt_hungarian_rhapsody_no_2__s5"
  ],
  "note": "train = all other segments; segment-level stratified, piece leakage disclosed"
 }

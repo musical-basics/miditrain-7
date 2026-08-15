@@ -243,6 +243,54 @@
    "time_signature": "12/8"
   },
   {
+   "id": "grieg_waltz_op_12_no_2__s0",
+   "piece": "grieg-waltz-op-12-no-2",
+   "measures": [
+    1,
+    16
+   ],
+   "n_notes": 129,
+   "n_labeled": 127,
+   "bar_ms": 1500,
+   "time_signature": "3/4"
+  },
+  {
+   "id": "grieg_waltz_op_12_no_2__s1",
+   "piece": "grieg-waltz-op-12-no-2",
+   "measures": [
+    17,
+    32
+   ],
+   "n_notes": 138,
+   "n_labeled": 136,
+   "bar_ms": 1500,
+   "time_signature": "3/4"
+  },
+  {
+   "id": "grieg_waltz_op_12_no_2__s2",
+   "piece": "grieg-waltz-op-12-no-2",
+   "measures": [
+    33,
+    48
+   ],
+   "n_notes": 142,
+   "n_labeled": 138,
+   "bar_ms": 1500,
+   "time_signature": "3/4"
+  },
+  {
+   "id": "grieg_waltz_op_12_no_2__s3",
+   "piece": "grieg-waltz-op-12-no-2",
+   "measures": [
+    49,
+    64
+   ],
+   "n_notes": 122,
+   "n_labeled": 120,
+   "bar_ms": 1500,
+   "time_signature": "3/4"
+  },
+  {
    "id": "liszt_hungarian_rhapsody_no_2__s0",
    "piece": "liszt-hungarian-rhapsody-no-2",
    "measures": [
@@ -409,6 +457,198 @@
    "n_labeled": 381,
    "bar_ms": 2000,
    "time_signature": "4/4"
+  },
+  {
+   "id": "waltz_in_a_minorchopin__s0",
+   "piece": "waltz-in-a-minorchopin",
+   "measures": [
+    2,
+    17
+   ],
+   "n_notes": 173,
+   "n_labeled": 169,
+   "bar_ms": 1500,
+   "time_signature": "3/4"
+  },
+  {
+   "id": "waltz_in_a_minorchopin__s1",
+   "piece": "waltz-in-a-minorchopin",
+   "measures": [
+    18,
+    25
+   ],
+   "n_notes": 216,
+   "n_labeled": 196,
+   "bar_ms": 1500,
+   "time_signature": "3/4"
+  },
+  {
+   "id": "waltz_in_a_minorchopin__s2",
+   "piece": "waltz-in-a-minorchopin",
+   "measures": [
+    26,
+    41
+   ],
+   "n_notes": 189,
+   "n_labeled": 177,
+   "bar_ms": 1500,
+   "time_signature": "3/4"
+  },
+  {
+   "id": "waltz_in_a_minorchopin__s3",
+   "piece": "waltz-in-a-minorchopin",
+   "measures": [
+    26,
+    41
+   ],
+   "n_notes": 189,
+   "n_labeled": 177,
+   "bar_ms": 1500,
+   "time_signature": "3/4"
+  },
+  {
+   "id": "waltz_in_a_minorchopin__s4",
+   "piece": "waltz-in-a-minorchopin",
+   "measures": [
+    42,
+    57
+   ],
+   "n_notes": 169,
+   "n_labeled": 158,
+   "bar_ms": 1500,
+   "time_signature": "3/4"
+  },
+  {
+   "id": "waltz_opus_64_no_2_in_c_minor__s0",
+   "piece": "waltz-opus-64-no-2-in-c-minor",
+   "measures": [
+    1,
+    16
+   ],
+   "n_notes": 163,
+   "n_labeled": 159,
+   "bar_ms": 1500,
+   "time_signature": "3/4"
+  },
+  {
+   "id": "waltz_opus_64_no_2_in_c_minor__s1",
+   "piece": "waltz-opus-64-no-2-in-c-minor",
+   "measures": [
+    17,
+    32
+   ],
+   "n_notes": 164,
+   "n_labeled": 160,
+   "bar_ms": 1500,
+   "time_signature": "3/4"
+  },
+  {
+   "id": "waltz_opus_64_no_2_in_c_minor__s2",
+   "piece": "waltz-opus-64-no-2-in-c-minor",
+   "measures": [
+    33,
+    48
+   ],
+   "n_notes": 162,
+   "n_labeled": 162,
+   "bar_ms": 1500,
+   "time_signature": "3/4"
+  },
+  {
+   "id": "waltz_opus_64_no_2_in_c_minor__s3",
+   "piece": "waltz-opus-64-no-2-in-c-minor",
+   "measures": [
+    49,
+    64
+   ],
+   "n_notes": 162,
+   "n_labeled": 162,
+   "bar_ms": 1500,
+   "time_signature": "3/4"
+  },
+  {
+   "id": "waltz_opus_64_no_2_in_c_minor__s5",
+   "piece": "waltz-opus-64-no-2-in-c-minor",
+   "measures": [
+    81,
+    96
+   ],
+   "n_notes": 125,
+   "n_labeled": 122,
+   "bar_ms": 1500,
+   "time_signature": "3/4"
+  },
+  {
+   "id": "waltz_opus_64_no_2_in_c_minor__s6",
+   "piece": "waltz-opus-64-no-2-in-c-minor",
+   "measures": [
+    97,
+    112
+   ],
+   "n_notes": 163,
+   "n_labeled": 163,
+   "bar_ms": 1500,
+   "time_signature": "3/4"
+  },
+  {
+   "id": "waltz_opus_64_no_2_in_c_minor__s7",
+   "piece": "waltz-opus-64-no-2-in-c-minor",
+   "measures": [
+    113,
+    128
+   ],
+   "n_notes": 162,
+   "n_labeled": 162,
+   "bar_ms": 1500,
+   "time_signature": "3/4"
+  },
+  {
+   "id": "waltz_opus_64_no_2_in_c_minor__s8",
+   "piece": "waltz-opus-64-no-2-in-c-minor",
+   "measures": [
+    129,
+    144
+   ],
+   "n_notes": 162,
+   "n_labeled": 158,
+   "bar_ms": 1500,
+   "time_signature": "3/4"
+  },
+  {
+   "id": "waltz_opus_64_no_2_in_c_minor__s9",
+   "piece": "waltz-opus-64-no-2-in-c-minor",
+   "measures": [
+    145,
+    160
+   ],
+   "n_notes": 166,
+   "n_labeled": 162,
+   "bar_ms": 1500,
+   "time_signature": "3/4"
+  },
+  {
+   "id": "waltz_opus_64_no_2_in_c_minor__s10",
+   "piece": "waltz-opus-64-no-2-in-c-minor",
+   "measures": [
+    161,
+    176
+   ],
+   "n_notes": 162,
+   "n_labeled": 162,
+   "bar_ms": 1500,
+   "time_signature": "3/4"
+  },
+  {
+   "id": "waltz_opus_64_no_2_in_c_minor__s11",
+   "piece": "waltz-opus-64-no-2-in-c-minor",
+   "measures": [
+    177,
+    192
+   ],
+   "n_notes": 162,
+   "n_labeled": 162,
+   "bar_ms": 1500,
+   "time_signature": "3/4"
   }
  ]
 }

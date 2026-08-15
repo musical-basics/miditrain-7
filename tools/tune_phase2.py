@@ -22,18 +22,18 @@ sys.path.insert(0, ROOT)
 
 from phase1_hands import separate_hands                   # noqa: E402
 from phase2_downbeat import infer_downbeats               # noqa: E402
-from score_downbeat import match                          # noqa: E402
+from score_downbeat import level_verdict, match           # noqa: E402
 
 TOL = 50.0
 
+# Objective (2026-08-14, matches the user's metric): acceptable segments
+# under meter equivalence first, exact-level second, pooled F1 third.
 COARSE = {
-    "bar_prior_center_ms": [1000.0, 1400.0, 1900.0],
-    "bar_prior_sigma_oct": [1.4, 2.2, 3.5],
-    "parsimony_margin": [1.05, 1.15, 1.3],
-    "w_harmony": [3.0, 5.0],
-    "w_bass": [1.5, 3.0],
-    "w_agogic": [0.75, 1.5],
-    "velocity_margin": [2, 4],
+    "w_hr": [0.0, 1.0, 2.0],
+    "w_resolution": [0.0, 1.5, 3.0],
+    "triple_margin": [1.0, 1.10],
+    "parsimony_margin": [1.15, 1.3],
+    "w_chord": [0.5, 1.5],
 }
 
 FINE = {   # refined around the coarse winner — edit after the coarse run
@@ -65,7 +65,7 @@ def _init():
 
 
 def evaluate(overrides, which="train"):
-    tp = fp = fn = strict = n = 0
+    tp = fp = fn = acc = ex = n = 0
     for seg, hands in SEGS:
         in_val = seg["id"] in VAL_IDS
         if (which == "train") == in_val:
@@ -73,15 +73,17 @@ def evaluate(overrides, which="train"):
         res = infer_downbeats(seg["notes"], hands, overrides)
         a, b, c = match(res["downbeats_ms"], seg["truth"]["downbeats_ms"], TOL,
                         seg["n_bars"] * seg["bar_ms"])
+        v = level_verdict(res["bar_ms"], seg["bar_ms"], a, b, c)
         tp += a
         fp += b
         fn += c
-        strict += (b == 0 and c == 0)
+        acc += (v != "wrong")
+        ex += (v == "exact")
         n += 1
     prec = tp / (tp + fp) if tp + fp else 0.0
     rec = tp / (tp + fn) if tp + fn else 0.0
     f1 = 2 * prec * rec / (prec + rec) if prec + rec else 0.0
-    return overrides, round(f1, 4), strict, round(rec, 4), n
+    return overrides, acc, ex, round(f1, 4), n
 
 
 def main():
@@ -98,17 +100,17 @@ def main():
     with mp.Pool(initializer=_init) as pool:
         results = pool.map(evaluate, configs)
 
-    results.sort(key=lambda r: (-r[1], -r[2]))
+    results.sort(key=lambda r: (-r[1], -r[2], -r[3]))
     _init()
-    print(f"\n{'trainF1':>8} {'str':>5}  {'valF1':>7} {'str':>5}  config")
-    for ov, f1, strict, rec, n in results[:12]:
-        _, vf1, vstrict, vrec, vn = evaluate(ov, "val")
-        print(f"{f1*100:7.1f}% {strict:3d}/{n}  {vf1*100:6.1f}% {vstrict:3d}/{vn}  "
+    print(f"\n{'train acc/ex':>13}  {'val acc/ex':>11}  {'trF1':>6}  config")
+    for ov, acc, ex, f1, n in results[:12]:
+        _, vacc, vex, vf1, vn = evaluate(ov, "val")
+        print(f"{acc:6d},{ex:3d}/{n}  {vacc:4d},{vex:3d}/{vn}  {f1*100:5.1f}%  "
               f"{json.dumps(ov)}")
-    _, f1, strict, rec, n = evaluate({})
-    _, vf1, vstrict, _, vn = evaluate({}, "val")
-    print(f"\ncurrent PARAMS: train F1 {f1*100:.1f}% ({strict}/{n} strict), "
-          f"val F1 {vf1*100:.1f}% ({vstrict}/{vn} strict)")
+    _, acc, ex, f1, n = evaluate({})
+    _, vacc, vex, vf1, vn = evaluate({}, "val")
+    print(f"\ncurrent PARAMS: train {acc},{ex}/{n} acceptable,exact; "
+          f"val {vacc},{vex}/{vn}")
 
 
 if __name__ == "__main__":

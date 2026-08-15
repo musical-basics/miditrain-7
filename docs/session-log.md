@@ -280,3 +280,44 @@ hungarian_s1 while costing 2 exact levels), entry is doing outsized work
 with parallelism/cadence channels before live use. Thermo remains absent
 from the engine; its accent-shaped role is covered, its cadence/tension
 role is a genuine untested gap.
+
+## 2026-08-15 — Waltzes (3/4 at last), regime-chroma harmony, the thermo channel
+
+**3 waltzes in** (Grieg Op.12/2, Chopin a-minor B.150, Chopin Op.64/2):
+pickups auto-trimmed (start m.2 per user), 20 clean 3/4 segments.
+Corpus: **13 pieces, 54 segments, all five meters** — and held-out 3/4
+promptly convicted the duple-default: 10/20 wrong (triple read as duple).
+The waltzes also exposed the chord channel voting AGAINST waltz downbeats
+(pah-pah chords sit on beats 2–3) and the harmony channel firing on
+TEXTURE change, not harmony change (oom→pah is a huge sounding-set jump
+but the same chord).
+
+**Harmony channel rebuilt as harmonic-REGIME change** (the fix): windowed
+duration×velocity-weighted chroma, trailing vs forward (600 ms), cosine
+distance. Chord tones sound through the bar, so within-bar votes vanish.
+Ablation verdict on 54 segments: **harmony is now the #2 load-bearing
+channel** (drop it: 49→44 acceptable, F1 −3.8) and the single strongest
+standalone (onset+harmony 46/54 vs onset+bass 44/54). In its old Jaccard
+form, dropping it had IMPROVED the score. Same machinery, right
+measurement.
+
+**Resolution channel added** (user's thermo insight: tension should come
+from the harmonic regime): tension = weighted interval dissonance of the
+forward chroma; vote where tension drops (cadential arrival). Ablation:
+**net zero at the margin but real signal** — it fixes hungarian_s1 and
+two waltz segments while breaking rage_s1/s3; dropping it keeps 49/54
+and gains one exact. Kept at w=1.5. Worthless alone (8/54) — ensemble
+evidence only. Upgrade path: gate on cadential root motion (falling
+fifth into the arrival) rather than raw dissonance drop.
+
+**Retune #3** (objective switched to the user's metric: acceptable →
+exact → F1): winner = parsimony 1.15, **triple_margin RETIRED (1.10 →
+1.0** — the waltzes killed it, as flagged when adopted untested),
+chord halved to 0.5, hr voter 1.0, resolution 1.5.
+
+**Result: 49/54 acceptable (waltzes 17/20), 36/54 exact, precision 92%.**
+Remaining 5: rage_s1 (750 ms tactus-family lock again), rage_s3,
+grieg_s2 + op64_s5 (duple in 3/4), grieg_s3 (right bar, beat-2 phase).
+Entry-channel dependence FELL (drop: −24 F1 before, −7 now) — the
+denser harmony votes absorb the phase burden; good for live readiness.
+measure_lock not re-run this session — re-measure with new channels.

@@ -27,11 +27,22 @@ Channels (all vote {time, weight}):
              run is not an accent; a LH chord louder than the LH's other
              chords is). This is what disambiguates the half-bar phase
              flip on the Arabesque, whose texture is otherwise symmetric
-  harmony    change of the sounding pitch-class set between consecutive
-             clusters (Jaccard distance) — harmony changes at bar starts;
-             miditrain-6's measured conclusion was that denser harmonic
-             votes are THE fix for bar-level hierarchy errors (its bus
-             locked to half-bars without them, and so did this engine)
+  harmony    harmonic-REGIME change: at each cluster, compare the
+             duration x velocity-weighted CHROMA of the trailing window
+             against the forward window (cosine distance). The first cut
+             compared consecutive sounding SETS (Jaccard) and measured
+             wrong on waltzes — "oom" (bass alone) -> "pah" (full chord)
+             is a huge set change but the same harmony; windowed chroma
+             sees the chord tones sounding through the bar, so within-bar
+             votes vanish and true chord changes stand out. miditrain-6's
+             conclusion stands: dense harmonic votes are THE fix for
+             bar-level hierarchy errors
+  resolution the thermodynamic idea, grounded in the harmonic regime
+             (user's insight 2026-08-14): tension = dissonance of the
+             forward chroma (weighted interval content — minor 2nds,
+             tritones); a vote fires where tension DROPS from the
+             previous cluster — the arrival of a resolution. Cadences
+             land on downbeats far more often than off them
   entry      the segment's first onset and each hand's first entrance —
              a phrase begins where a stream enters from silence. SCOPE
              DEBT: valid while segments are phrase-aligned with no pickup
@@ -61,6 +72,15 @@ Decision:
      duple is the default reading, triple needs positive evidence (2/4
      textures kept electing G=3 by ~2%). The winning (tactus, G, phase)
      maximizes tactus_score x level_score across the K candidates.
+
+     HARMONIC-RHYTHM LEVEL VOTER (w_hr): the level score is scaled by
+     how much the harmony-change votes CONCENTRATE on the candidate's
+     downbeat lines versus its other beat positions. Harmony is the one
+     channel whose natural period IS the bar (waltzes and the Hungarian
+     friska change chords once per bar), so its concentration
+     discriminates levels where accent folding is self-similar. Accent
+     contrast was measured out above; harmonic contrast is a different
+     animal because harmonic changes are NOT expected on every beat.
   3. Downbeats projected from (bar_ms, phase), then (period, phase)
      refined by least squares against the onset votes the grid captured
      (kills the ~0.4% tactus quantization drift that walked late bars
@@ -83,28 +103,76 @@ PARAMS = {
     "tactus_prior_center_ms": 600.0,
     "tactus_prior_sigma_oct": 0.9,     # miditrain-6 corpus-searched value
     "fold_tol_frac": 0.06,      # vote counts if within this fraction of P
-    # Grid-searched 2026-08-14 on the committed train/val split
-    # (benchmarks/split.json): train F1 95.8 (10/12 strict), val F1 100
-    # (8/8 strict). Key lever vs the first tune: parsimony 1.12 -> 1.3.
+    # Grid-searched 2026-08-14 (3rd tune, 54-segment corpus with 3/4):
+    # train 31,23/34 val 18,14/20 acceptable,exact. The waltzes KILLED
+    # the triple margin (1.10 -> 1.0): duple-by-default suppressed real
+    # 3/4; chord halved (waltz pah-pah chords vote for beats 2/3).
     "groupings": (2, 3, 4),
-    "parsimony_margin": 1.3,    # larger G must beat G=2 by this factor
-    "triple_margin": 1.10,      # G=3 must beat the best duple by this
+    "parsimony_margin": 1.15,   # larger G must beat G=2 by this factor
+    "triple_margin": 1.0,       # retired by the waltz corpus (was 1.10)
     "n_tactus_candidates": 5,   # top-K distinct peaks carried into step 2
     "tactus_peak_sep": 0.08,    # peaks must differ by this period fraction
     "bar_prior_center_ms": 1900.0,     # miditrain-6 corpus-searched values
     "bar_prior_sigma_oct": 1.4,
     "w_onset": 1.0,
     "w_bass": 3.0,
-    "w_chord": 1.5,
+    "w_chord": 0.5,
     "w_agogic": 0.75,
     "w_velocity": 0.5,
     "w_harmony": 3.0,
-    "harmony_min_dist": 0.35,   # Jaccard distance below this = no vote
+    "harmony_min_dist": 0.2,    # chroma cosine distance below this = no vote
+    "harmony_window_ms": 600.0, # regime chroma window (each side)
     "w_entry": 2.0,
+    "w_hr": 1.0,                # harmonic-rhythm level voter strength
+    "w_resolution": 1.5,
+    "resolution_min_drop": 0.04,  # dissonance drop below this = no vote
     "agogic_ratio": 1.8,        # duration > ratio × local median = accent
     "velocity_margin": 2,       # velocity above the SAME HAND's local mean
     "local_window_ms": 3000.0,
 }
+
+
+# interval dissonance weights on the chroma circle (semitone distance
+# 0..6): unison/octave and perfect intervals are restful, minor seconds
+# and the tritone carry the tension
+_DISS = {0: 0.0, 1: 1.0, 2: 0.35, 3: 0.1, 4: 0.08, 5: 0.05, 6: 0.8}
+
+
+def _chroma(notes, t0, t1):
+    """Duration x velocity-weighted pitch-class profile of everything
+    sounding in [t0, t1)."""
+    c = [0.0] * 12
+    for n in notes:
+        lo = max(t0, n["onset_ms"])
+        hi = min(t1, n["onset_ms"] + n["duration_ms"])
+        if hi > lo:
+            c[n["pitch"] % 12] += (hi - lo) / 1000.0 * (n["velocity"] / 127.0)
+    return c
+
+
+def _chroma_dist(a, b):
+    na = math.sqrt(sum(x * x for x in a))
+    nb = math.sqrt(sum(x * x for x in b))
+    if na == 0 or nb == 0:
+        return 0.0
+    dot = sum(x * y for x, y in zip(a, b))
+    return 1.0 - dot / (na * nb)
+
+
+def _dissonance(chroma):
+    total = sum(chroma)
+    if total <= 0:
+        return 0.0
+    s = 0.0
+    for i in range(12):
+        if chroma[i] <= 0:
+            continue
+        for j in range(i + 1, 12):
+            if chroma[j] <= 0:
+                continue
+            iv = min((j - i) % 12, (i - j) % 12)
+            s += chroma[i] * chroma[j] * _DISS[iv]
+    return s / (total * total)
 
 
 def _clusters(notes, hands, cluster_ms):
@@ -125,7 +193,7 @@ def build_votes(notes, hands, p):
     local context = a trailing window, no whole-piece statistics."""
     clusters = _clusters(notes, hands, p["cluster_ms"])
     votes = {"onset": [], "bass": [], "chord": [], "agogic": [],
-             "velocity": [], "harmony": [], "entry": []}
+             "velocity": [], "harmony": [], "resolution": [], "entry": []}
 
     if clusters:
         votes["entry"].append({"t": clusters[0]["t"], "w": 1.0})
@@ -141,7 +209,7 @@ def build_votes(notes, hands, p):
     # running pitch center for bass depth (EMA over cluster means)
     center = None
     win = []          # trailing (t, duration, velocity) for local context
-    prev_pcs = None   # sounding pitch-class set at the previous cluster
+    prev_diss = None  # dissonance of the previous cluster's forward chroma
     for c in clusters:
         t = c["t"]
         pitches = [notes[i]["pitch"] for i in c["idx"]]
@@ -163,20 +231,23 @@ def build_votes(notes, hands, p):
             if w > 0:
                 votes["bass"].append({"t": t, "w": w})
 
-        # harmonic change: sounding pitch-class set (this cluster's notes
-        # plus everything still ringing) vs the previous cluster's
-        pcs = set()
-        for n in notes:
-            if n["onset_ms"] <= t < n["onset_ms"] + n["duration_ms"] \
-                    or n["onset_ms"] == t:
-                pcs.add(n["pitch"] % 12)
-        if prev_pcs:
-            inter = len(pcs & prev_pcs)
-            union = len(pcs | prev_pcs)
-            dist = 1.0 - (inter / union if union else 1.0)
+        # harmonic-regime change: trailing vs forward windowed chroma
+        W = p["harmony_window_ms"]
+        back = _chroma(notes, t - W, t)
+        fwd = _chroma(notes, t, t + W)
+        if sum(back) > 0 and sum(fwd) > 0:
+            dist = _chroma_dist(back, fwd)
             if dist > p["harmony_min_dist"]:
                 votes["harmony"].append({"t": t, "w": dist})
-        prev_pcs = pcs
+
+        # resolution: tension (dissonance of the forward regime) DROPPING
+        # at this cluster — a cadential arrival
+        diss = _dissonance(fwd)
+        if prev_diss is not None:
+            drop = prev_diss - diss
+            if drop > p["resolution_min_drop"]:
+                votes["resolution"].append({"t": t, "w": drop})
+        prev_diss = diss
 
         # local context: trailing window, kept PER HAND — an accent is
         # only an accent relative to the same hand's own recent level
@@ -272,7 +343,7 @@ def _tactus(votes, p):
 
 def _bar(votes, tactus_ms, tactus_phase, span_ms, p):
     periodic = (votes["bass"] + votes["chord"] + votes["agogic"]
-                + votes["velocity"] + votes["harmony"])
+                + votes["velocity"] + votes["harmony"] + votes["resolution"])
     tol = p["fold_tol_frac"] * tactus_ms
 
     def bar_prior(bar):
@@ -287,7 +358,10 @@ def _bar(votes, tactus_ms, tactus_phase, span_ms, p):
                 mass += v["w"]
         return mass
 
-    # level: periodic evidence only, per-line normalized
+    # level: periodic evidence only, per-line normalized, scaled by the
+    # harmonic-rhythm voter (concentration of harmony changes on the
+    # candidate's downbeat lines vs its other beat positions)
+    total_harm = sum(v["w"] for v in votes["harmony"])
     results = {}
     for g in p["groupings"]:
         bar = g * tactus_ms
@@ -296,6 +370,13 @@ def _bar(votes, tactus_ms, tactus_phase, span_ms, p):
         for k in range(g):
             phase = (tactus_phase + k * tactus_ms) % bar
             per_line = folded(periodic, phase, bar) / n_lines * bar_prior(bar)
+            if total_harm > 0 and p["w_hr"] > 0:
+                h_on = folded(votes["harmony"], phase, bar)
+                h_off = [folded(votes["harmony"],
+                                (tactus_phase + j * tactus_ms) % bar, bar)
+                         for j in range(g) if j != k]
+                h_contrast = (h_on - sum(h_off) / max(1, len(h_off))) / total_harm
+                per_line *= max(0.1, 1.0 + p["w_hr"] * h_contrast)
             if per_line > best[0]:
                 best = (per_line, phase)
         results[g] = best
@@ -328,7 +409,7 @@ def grid_level_score(votes, bar_ms, phase, span_ms, params=None):
     if params:
         p.update(params)
     periodic = (votes["bass"] + votes["chord"] + votes["agogic"]
-                + votes["velocity"] + votes["harmony"])
+                + votes["velocity"] + votes["harmony"] + votes["resolution"])
     tol = p["fold_tol_frac"] * bar_ms / 2.0
     mass = 0.0
     for v in periodic:

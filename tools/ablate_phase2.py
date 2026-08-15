@@ -26,9 +26,9 @@ from phase2_downbeat import infer_downbeats               # noqa: E402
 from score_downbeat import level_verdict, match           # noqa: E402
 
 TOL = 50.0
-STRUCTURAL = ("harmony", "bass", "chord", "agogic", "velocity", "entry")
+STRUCTURAL = ("harmony", "resolution", "bass", "chord", "agogic", "velocity", "entry")
 
-CONFIGS = [("full", {})]
+CONFIGS = [("full", {}), ("- hr voter", {"w_hr": 0.0})]
 for ch in STRUCTURAL:
     CONFIGS.append((f"- {ch}", {f"w_{ch}": 0.0}))
 CONFIGS.append(("onset only", {f"w_{c}": 0.0 for c in STRUCTURAL}))
