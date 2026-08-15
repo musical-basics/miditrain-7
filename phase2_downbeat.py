@@ -42,7 +42,18 @@ Channels (all vote {time, weight}):
              forward chroma (weighted interval content — minor 2nds,
              tritones); a vote fires where tension DROPS from the
              previous cluster — the arrival of a resolution. Cadences
-             land on downbeats far more often than off them
+             land on downbeats far more often than off them.
+             CADENCE GATE: the vote is multiplied by `cadence_boost`
+             when the bass moves by a falling fifth / rising fourth into
+             the arrival (dominant -> tonic root motion) — the part of
+             "cadence" a chroma distance cannot see
+  parallelism GTTM MPR1: repeated melodic material votes on period AND
+             phase jointly. Matching 4-note contour+rhythm n-grams in
+             the melody stream emit {anchor, lag} votes; at level
+             selection, anchors whose lag is an integer multiple of the
+             candidate bar support the phase they anchor. Repetition is
+             the one cue that knows where a GROUP starts, not just where
+             accents fall
   entry      the segment's first onset and each hand's first entrance —
              a phrase begins where a stream enters from silence. SCOPE
              DEBT: valid while segments are phrase-aligned with no pickup
@@ -126,6 +137,13 @@ PARAMS = {
     "w_hr": 1.0,                # harmonic-rhythm level voter strength
     "w_resolution": 1.5,
     "resolution_min_drop": 0.04,  # dissonance drop below this = no vote
+    "cadence_boost": 3.0,       # x on resolution votes with V->I bass motion
+    "w_par": 0.0,               # parallelism level voter: MEASURED OUT
+                                # 2026-08-15 (repetition anchors land on
+                                # beats 1 and 3 alike); kept selectable
+    "par_min_lag_ms": 800.0,
+    "par_max_lag_ms": 16000.0,
+    "par_ngram": 4,             # notes per matched melodic fragment
     "agogic_ratio": 1.8,        # duration > ratio × local median = accent
     "velocity_margin": 2,       # velocity above the SAME HAND's local mean
     "local_window_ms": 3000.0,
@@ -210,6 +228,7 @@ def build_votes(notes, hands, p):
     center = None
     win = []          # trailing (t, duration, velocity) for local context
     prev_diss = None  # dissonance of the previous cluster's forward chroma
+    prev_bass_pc = None
     for c in clusters:
         t = c["t"]
         pitches = [notes[i]["pitch"] for i in c["idx"]]
@@ -241,13 +260,21 @@ def build_votes(notes, hands, p):
                 votes["harmony"].append({"t": t, "w": dist})
 
         # resolution: tension (dissonance of the forward regime) DROPPING
-        # at this cluster — a cadential arrival
+        # at this cluster — a cadential arrival. Boosted when the bass
+        # moves dominant -> tonic (falling fifth / rising fourth) into it.
+        bass_pc = (min(notes[i]["pitch"] for i in c["L"]) % 12) if c["L"] else None
         diss = _dissonance(fwd)
         if prev_diss is not None:
             drop = prev_diss - diss
             if drop > p["resolution_min_drop"]:
-                votes["resolution"].append({"t": t, "w": drop})
+                w = drop
+                if bass_pc is not None and prev_bass_pc is not None \
+                        and (prev_bass_pc - bass_pc) % 12 == 7:
+                    w *= p["cadence_boost"]
+                votes["resolution"].append({"t": t, "w": w})
         prev_diss = diss
+        if bass_pc is not None:
+            prev_bass_pc = bass_pc
 
         # local context: trailing window, kept PER HAND — an accent is
         # only an accent relative to the same hand's own recent level
@@ -279,6 +306,42 @@ def build_votes(notes, hands, p):
             for v in vs:
                 v["w"] *= scale
     return votes
+
+
+def build_parallelism(notes, hands, p):
+    """GTTM MPR1-lite: matched melodic fragments -> {anchor, lag, w}.
+
+    Melody stream = highest right-hand note per onset cluster. Two
+    positions match when `par_ngram` consecutive notes share the same
+    pitch contour (intervals from the fragment start) AND the same
+    rhythm (relative onsets within 30 ms). Both occurrences anchor.
+    """
+    clusters = _clusters(notes, hands, p["cluster_ms"])
+    mel = []
+    for c in clusters:
+        r = [i for i in c["idx"] if hands[i] != "L"]
+        if r:
+            mel.append((c["t"], max(notes[i]["pitch"] for i in r)))
+    n = p["par_ngram"]
+    out = []
+    for i in range(len(mel) - n + 1):
+        for j in range(i + 1, len(mel) - n + 1):
+            lag = mel[j][0] - mel[i][0]
+            if lag < p["par_min_lag_ms"]:
+                continue
+            if lag > p["par_max_lag_ms"]:
+                break
+            ok = True
+            for k in range(1, n):
+                if (mel[i + k][1] - mel[i][1] != mel[j + k][1] - mel[j][1]
+                        or abs((mel[i + k][0] - mel[i][0])
+                               - (mel[j + k][0] - mel[j][0])) > 30):
+                    ok = False
+                    break
+            if ok:
+                out.append({"anchor": mel[i][0], "lag": lag, "w": 1.0})
+                out.append({"anchor": mel[j][0], "lag": lag, "w": 1.0})
+    return out
 
 
 def _folded_best_phase(vote_list, period, tol):
@@ -341,10 +404,25 @@ def _tactus(votes, p):
     return peaks
 
 
-def _bar(votes, tactus_ms, tactus_phase, span_ms, p):
+def _bar(votes, tactus_ms, tactus_phase, span_ms, p, par=()):
     periodic = (votes["bass"] + votes["chord"] + votes["agogic"]
                 + votes["velocity"] + votes["harmony"] + votes["resolution"])
     tol = p["fold_tol_frac"] * tactus_ms
+
+    def par_contrast(phase, bar):
+        """Fraction of bar-multiple-lag repetition anchors landing ON the
+        candidate downbeat lines, minus the chance rate."""
+        on = tot = 0.0
+        for v in par:
+            m = round(v["lag"] / bar)
+            if m >= 1 and abs(v["lag"] - m * bar) <= tol:
+                tot += v["w"]
+                d = (v["anchor"] - phase) % bar
+                if d <= tol or bar - d <= tol:
+                    on += v["w"]
+        if tot <= 0:
+            return 0.0
+        return on / tot - 2 * tol / bar
 
     def bar_prior(bar):
         octs = math.log2(bar / p["bar_prior_center_ms"])
@@ -377,6 +455,8 @@ def _bar(votes, tactus_ms, tactus_phase, span_ms, p):
                          for j in range(g) if j != k]
                 h_contrast = (h_on - sum(h_off) / max(1, len(h_off))) / total_harm
                 per_line *= max(0.1, 1.0 + p["w_hr"] * h_contrast)
+            if par and p["w_par"] > 0:
+                per_line *= max(0.1, 1.0 + p["w_par"] * par_contrast(phase, bar))
             if per_line > best[0]:
                 best = (per_line, phase)
         results[g] = best
@@ -466,11 +546,12 @@ def infer_downbeats(notes, hands, params=None):
     if not notes:
         return {"downbeats_ms": [], "bar_ms": None}
     votes = build_votes(notes, hands, p)
+    par = build_parallelism(notes, hands, p) if p["w_par"] > 0 else ()
     span = max(n["onset_ms"] + n["duration_ms"] for n in notes)
     # joint (tactus, level) decision over the top-K tactus peaks
     best = None
     for tactus_ms, tactus_phase, t_score in _tactus(votes, p):
-        g, bar_phase, level_score = _bar(votes, tactus_ms, tactus_phase, span, p)
+        g, bar_phase, level_score = _bar(votes, tactus_ms, tactus_phase, span, p, par)
         joint = t_score * level_score
         if best is None or joint > best[0]:
             best = (joint, tactus_ms, g, bar_phase)

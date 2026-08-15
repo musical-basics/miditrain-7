@@ -29,11 +29,10 @@ TOL = 50.0
 # Objective (2026-08-14, matches the user's metric): acceptable segments
 # under meter equivalence first, exact-level second, pooled F1 third.
 COARSE = {
-    "w_hr": [0.0, 1.0, 2.0],
-    "w_resolution": [0.0, 1.5, 3.0],
-    "triple_margin": [1.0, 1.10],
-    "parsimony_margin": [1.15, 1.3],
-    "w_chord": [0.5, 1.5],
+    "w_par": [0.0, 1.0, 2.0],
+    "cadence_boost": [1.0, 3.0, 6.0],
+    "w_resolution": [1.5, 3.0],
+    "w_hr": [1.0, 2.0],
 }
 
 FINE = {   # refined around the coarse winner — edit after the coarse run

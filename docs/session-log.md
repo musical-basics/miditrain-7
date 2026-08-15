@@ -321,3 +321,26 @@ grieg_s2 + op64_s5 (duple in 3/4), grieg_s3 (right bar, beat-2 phase).
 Entry-channel dependence FELL (drop: −24 F1 before, −7 now) — the
 denser harmony votes absorb the phase burden; good for live readiness.
 measure_lock not re-run this session — re-measure with new channels.
+
+## 2026-08-15 (later) — Cadence gate ships, parallelism measured out, deepthink brief written
+
+- **Cadence-gated resolution** (x3 on tension-drop votes when the bass
+  falls a fifth into the arrival): val 18→20/20 acceptable — fixed BOTH
+  remaining Rage 2/4 segments. The user's thermo-from-harmonic-regime
+  idea, sharpened into V→I detection, is now a net contributor.
+- **Parallelism channel** built (matched 4-note contour+rhythm n-grams
+  → {anchor, lag} votes; bar-multiple lags support their anchor's
+  phase) and MEASURED OUT as a level voter — repetition anchors land on
+  beats 1 and 3 alike in this repertoire. Kept selectable (w_par=0);
+  untried variants (phase-stage, tactus-stage) noted in the brief.
+- **Result: 51/54 acceptable, 38/54 exact, precision 92%.** Remaining:
+  rage_s3 (745 ms tactus family — the true pulse has no fold peak),
+  grieg_s3 (beat-2 phase — every accent points at beat 2), op64_s5
+  (thin-evidence sostenuto duple lock). Each diagnosed with data in
+  docs/deepthink_downbeat_challenge.md — the architect brief for an
+  external model (architecture, measured channel values, exhausted
+  directions, 5 concrete questions, no-regression gate).
+- Streaming re-measured with the new channels: raw 51/54 locks (median
+  10.25 s), tracked 45/54 (median 5.00 s) — the tracker is faster where
+  it locks but sticks on 6 segments raw inference solves; hysteresis
+  retuning is queued behind the level work.
