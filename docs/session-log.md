@@ -344,3 +344,26 @@ measure_lock not re-run this session — re-measure with new channels.
   10.25 s), tracked 45/54 (median 5.00 s) — the tracker is faster where
   it locks but sticks on 6 segments raw inference solves; hysteresis
   retuning is queued behind the level work.
+
+## 2026-08-15 (evening) — Deepthink response received; MeterHypothesis spec drawn up
+
+External architect review of the brief came back. Its verdict: keep the
+evidence bus, replace the layer above it — votes → metrical-hierarchy
+lattice → one score_hypothesis() → beam tracker with confidence. Its
+central code claim was VERIFIED before adoption: `grid_level_score`
+(the tracker's comparator) uses `fold_tol_frac * bar_ms / 2` where
+`_bar` uses `fold_tol_frac * tactus_ms` — a 2x-wider capture window for
+G=4 incumbents — and omits the hr multiplier and tactus factor the real
+selector uses. Likely contributor to tracked 45/54 vs raw 51/54.
+
+**docs/spec_meter_hypothesis.md written** — 6 stages, each selectable
+(rule 9) and gated on the 51/54 suite: S1 unify scoring
+(behavior-neutral, fixes the tracker mismatch), S2 evaluation triad
+(cold-start + continuous-piece + leave-one-piece-out), S3 metrical
+lattice + subdivision-support term (rage_s3), S4 harmonic rhythm as a
+level RATIO with reliability gating (selectable vs today's
+concentration), S5 event-role grammar anchor→continuation (grieg_s3),
+S6 beam tracker + confidence/abstention + channel reliability
+(op64_s5 via continuity). 4 user decisions surfaced in the spec
+(op64_s5 gate reframe, hr_mode default, beam-vs-hysteresis default,
+stage order). No implementation started.
