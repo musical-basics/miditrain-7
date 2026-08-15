@@ -254,3 +254,29 @@ JS errors; server killed after.
 wanted (~15 per the old spec); no benchmark gate yet (single-command
 regression check à la miditrain-6's run_benchmark.py becomes worth it as
 soon as there are two competing configs).
+
+## 2026-08-14 (late night) — Channel ablation: what actually finds the downbeat
+
+tools/ablate_phase2.py, all 34 segments, drop-one + build-up-from-onset:
+
+| config | acceptable | exact | raw F1 |
+|---|---|---|---|
+| full | 33/34 | 26/34 | 89.6% |
+| − harmony | 34/34 | 24/34 | 88.9% |
+| − bass | 30/34 | 20/34 | 82.4% |
+| − chord | 32/34 | 23/34 | 86.8% |
+| − agogic | 34/34 | 22/34 | 87.4% |
+| − velocity | 31/34 | 26/34 | 88.5% |
+| − entry | 25/34 | 21/34 | 65.6% |
+| onset only | 19/34 | 1/34 | 46.9% |
+| onset + harmony | 23/34 | 14/34 | 65.5% |
+| onset + bass | 23/34 | 19/34 | 59.4% |
+
+Findings recorded in the session summary; headline: bass is the most
+load-bearing structural channel, harmony (the harmonic-color descendant)
+is real but weak in its sparse change-spike form (removing it even fixes
+hungarian_s1 while costing 2 exact levels), entry is doing outsized work
+(F1 −24 points without it) which is a phrase-alignment crutch to replace
+with parallelism/cadence channels before live use. Thermo remains absent
+from the engine; its accent-shaped role is covered, its cadence/tension
+role is a genuine untested gap.
